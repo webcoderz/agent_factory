@@ -56,6 +56,51 @@ async def lookup(ctx: PAIRunContext[PatternsRunContext], query: str) -> str:
     return "..."
 ```
 
+## Memory and conversation history
+
+Plug in our memory so the agent uses **history_processors** (window/summarized context) and **checkpoint** after each run:
+
+```python
+from agent_ext import (
+    PydanticAIAgentBase,
+    RunContext,
+    SlidingWindowMemory,
+    SummarizingMemory,
+    SummarizeConfig,
+)
+
+# Option 1: sliding window (last N messages only)
+memory = SlidingWindowMemory(max_messages=20)
+
+# Option 2: summarizing memory (dossier + last N messages)
+# memory = SummarizingMemory(cfg=SummarizeConfig(), summarize_fn=your_summarize_fn)
+
+class MyAgent(PydanticAIAgentBase[MyOutput]):
+    def __init__(self):
+        super().__init__(
+            "openai:gpt-4o",
+            output_type=MyOutput,
+            instructions="Be helpful.",
+            memory=memory,
+        )
+
+agent = MyAgent()
+result1 = agent.run_sync(ctx, "What is 2+2?")
+# Next turn: pass message_history so the agent sees the conversation
+result2 = agent.run_sync(ctx, "And in hex?", message_history=result1.new_messages())
+```
+
+- **shape_messages** runs as a pydantic-ai history_processor before each model request (window or dossier + tail).
+- **checkpoint** is called after each `run_sync` / `run` with the full message history and result (so `SummarizingMemory` can update the dossier and persist it via `ctx.artifacts`).
+
+To use the adapter standalone (e.g. to add your own history processor):  
+`from agent_ext.agent import build_history_processor, checkpoint_after_run`.
+
+**Tool calls and safe truncation**  
+- History is truncated so **tool call pairs** are never split: we only drop from the front at boundaries where the first kept message is a `ModelRequest`. That way a `ModelResponse` with `ToolCallPart` is never kept without the following `ModelRequest` with `ToolReturnPart`.
+- Full message structure (including tool calls) is preserved through the processor by keeping `_original` in generic dicts; only synthetic messages (e.g. dossier) are rebuilt from role/content.
+- Helpers for inspecting messages: `message_kind(msg)`, `has_tool_calls(msg)`, `has_tool_returns(msg)`, and `safe_truncate_messages(messages, max_messages)` are available from `agent_ext.agent`.
+
 ## Imports
 
 - **Run context and types** live in `agent_patterns.run_context` (and are re-exported from `agent_ext`). The root module was renamed from `types` to avoid shadowing the stdlib `types` module.
