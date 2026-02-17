@@ -485,6 +485,69 @@ result: IngestResult = pipeline.run(ctx, doc)
 - **IngestResult**: doc_artifact_id, page_images, ocr_pages, evidence_chunks. Feed evidence into research or an agent context.
 - **MultiExtractor**: combine multiple **PageExtractor**s; **OCRRetryAction** / retry planner for validation failures.
 
+### OCR with the wrapped agent (vision / LLM)
+
+You can run **vision OCR** using our **PydanticAIAgentBase** and ingest pipeline: PDF → page images → one LLM call per page (image + prompt) → structured or plain text per page. This follows the same pattern as the [pydantic-ai OCR examples](https://github.com/vstorm-co/pydantic-ai-examples/tree/main/ocr_parsing) (PDF→images, send image to the model, structured output with validation), but wired to our **RunContext**, **IngestPipeline**, and **LLMVisionOCREngine**.
+
+1. **Structured output model** (optional): use **PageOCROutput** (and **PageOCRElement**) so the agent returns schema-validated OCR per page (`file_type`, `file_content_md`, `file_elements`). Pydantic validates the LLM response; see [pydantic-ai structured OCR](https://github.com/vstorm-co/pydantic-ai-examples/blob/main/ocr_parsing/2_ocr_with_structured_output.py) and [validation](https://github.com/vstorm-co/pydantic-ai-examples/blob/main/ocr_parsing/3_ocr_validation.py) for the idea.
+
+2. **OCR agent**: subclass **PydanticAIAgentBase[PageOCROutput]** (or `str` for plain markdown). Use a vision-capable model (e.g. `openai:gpt-4o`) and instructions that describe the OCR task and output shape.
+
+3. **LLMVisionOCREngine**: wraps your agent; for each page image it sends `[prompt, BinaryContent(image)]` to the agent and maps the result to **OCRPage** (e.g. `full_text` from `file_content_md`). Wire it as the pipeline’s `ocr_engine`.
+
+4. **Pipeline**: **PDFToImages** (e.g. with **Pdf2ImageRenderer** from `agent_ext.ingest.pdf2image_renderer`) → **LLMVisionOCREngine** → validator (optional) → **PageExtractor** (e.g. **MarkdownDumpExtractor**). Run with **RunContext** and **DocumentInput**; get **IngestResult.ocr_pages** and **evidence_chunks**.
+
+```python
+from agent_ext import (
+    RunContext,
+    PydanticAIAgentBase,
+    IngestPipeline,
+    DocumentInput,
+    IngestResult,
+    PDFToImages,
+    LLMVisionOCREngine,
+    PageOCROutput,
+)
+from agent_ext.ingest.extractors import MarkdownDumpExtractor
+from agent_ext.ingest.pdf2image_renderer import Pdf2ImageRenderer
+
+# 1) Structured output model (optional; use str for plain text)
+# PageOCROutput has file_type, file_content_md, file_elements (list of PageOCRElement)
+
+# 2) OCR agent: vision model + instructions + output_type
+class OCRAgent(PydanticAIAgentBase[PageOCROutput]):
+    def __init__(self):
+        super().__init__(
+            "openai:gpt-4o",
+            output_type=PageOCROutput,
+            instructions="You are an OCR expert. Extract text and structure from the document image. Return file_type, file_content_md (Markdown), and file_elements (element_type, element_content).",
+        )
+
+ocr_agent = OCRAgent()
+prompt = "Perform OCR on this document page. Return structured output: file_type, file_content_md, file_elements."
+
+# 3) Vision OCR engine: one agent run per page image
+ocr_engine = LLMVisionOCREngine(ocr_agent, prompt, media_type="image/png")
+
+# 4) Pipeline: PDF → images (Pdf2ImageRenderer) → LLM OCR → evidence
+pdf_to_images = PDFToImages(Pdf2ImageRenderer(), dpi=200)
+pipeline = IngestPipeline(
+    pdf_to_images=pdf_to_images,
+    ocr_engine=ocr_engine,
+    extractor=MarkdownDumpExtractor(),
+    validator=None,
+)
+
+ctx = RunContext(...)  # case_id, policy, cache, logger, artifacts (required for PDFToImages + engine)
+doc = DocumentInput(artifact_id="doc-1", path="/path/to/doc.pdf")
+result: IngestResult = pipeline.run(ctx, doc)
+# result.ocr_pages[i].full_text, result.ocr_pages[i].metadata.get("structured"), result.evidence_chunks
+```
+
+- **Artifacts**: **PDFToImages** and **LLMVisionOCREngine** use **ctx.artifacts** (get_bytes/put_bytes for page images). Ensure the document is stored as an artifact or that you load it and put it before calling **pipeline.run**.
+- **Concurrency**: the pipeline runs pages sequentially; for parallel page calls you could extend **LLMVisionOCREngine** or run multiple pipelines in parallel with a shared context.
+- A minimal runnable demo is in **examples/ocr_with_agent_demo.py** (requires configured RunContext and artifact store).
+
 ---
 
 ## 11. Deep research (plan → execute → gaps → synthesize)
@@ -663,7 +726,7 @@ chain.after_run(ctx, result)
 | Subagents | `agent_ext` | Subagent, SubagentResult, SubagentRegistry, SubagentOrchestrator |
 | RLM | `agent_ext` | RLMPolicy, run_restricted_python |
 | Todo | `agent_ext` | Task, TaskCreate, TaskPatch, TaskQuery, TaskStatus, TaskStore, InMemoryTaskStore, PostgresTaskStore, TaskEvent, TaskEventBus, InProcessEventBus, WebhookEventBus, TodoToolset |
-| Ingest | `agent_ext` | DocumentInput, IngestResult, IngestPipeline, PDFToImages, OCREngine, PageExtractor, OCRValidator, OCRValidationPolicy, ValidationEvidenceEmitter, MultiExtractor, OCRRetryAction |
+| Ingest | `agent_ext` | DocumentInput, IngestResult, PageImage, OCRPage, OCRSpan, PageOCROutput, PageOCRElement, IngestPipeline, PDFToImages, OCREngine, LLMVisionOCREngine, PageExtractor, OCRValidator, OCRValidationPolicy, ValidationEvidenceEmitter, MultiExtractor, OCRRetryAction |
 | Research | `agent_ext.research` | DeepResearchController; planner, executor, ledger, models in agent_ext.research.* |
 | Pydantic-AI agent | `agent_ext` | PydanticAIAgentBase |
 | Agent memory / tools | `agent_ext.agent` | build_history_processor, checkpoint_after_run, message_kind, has_tool_calls, has_tool_returns, safe_truncate_messages |

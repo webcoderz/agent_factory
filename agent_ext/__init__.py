@@ -28,9 +28,10 @@ from .subagents.orchestrator import SubagentOrchestrator
 from .subagents.registry import SubagentRegistry
 from .rlm.policies import RLMPolicy
 from .rlm.python_runner import run_restricted_python
-from .ingest.models import DocumentInput, IngestResult, PageImage, OCRPage, OCRSpan
+from .ingest.models import DocumentInput, IngestResult, PageImage, OCRPage, OCRSpan, PageOCROutput, PageOCRElement
 from .ingest.pdf_to_images import PDFToImages
 from .ingest.ocr_engines import OCREngine
+from .ingest.llm_ocr_engine import LLMVisionOCREngine
 from .ingest.extractors import PageExtractor
 from .ingest.validation import OCRValidator, OCRValidationPolicy
 from .ingest.validation_evidence import ValidationEvidenceEmitter
@@ -58,8 +59,8 @@ __all__ = [
     "Subagent", "SubagentResult",
     "SubagentOrchestrator", "SubagentRegistry",
     "RLMPolicy", "run_restricted_python",
-    "DocumentInput", "IngestResult", "PageImage", "OCRPage", "OCRSpan",
-    "PDFToImages", "OCREngine", "PageExtractor",
+    "DocumentInput", "IngestResult", "PageImage", "OCRPage", "OCRSpan", "PageOCROutput", "PageOCRElement",
+    "PDFToImages", "OCREngine", "LLMVisionOCREngine", "PageExtractor",
     "OCRValidator", "OCRValidationPolicy", "ValidationEvidenceEmitter",
     "IngestPipeline", "OCRRetryAction", "MultiExtractor",
     "PydanticAIAgentBase",

@@ -38,6 +38,22 @@ class OCRPage(BaseModel):
     metadata: Dict[str, Any] = Field(default_factory=dict)
 
 
+class PageOCRElement(BaseModel):
+    """Single element on a page (table, paragraph, image description, etc.) for structured vision OCR."""
+    element_type: str = ""
+    element_content: str = ""
+
+
+class PageOCROutput(BaseModel):
+    """
+    Structured output from a vision/LLM OCR agent per page.
+    Use with PydanticAIAgentBase[PageOCROutput] for schema-validated OCR (see README §10).
+    """
+    file_type: str = ""
+    file_content_md: str = ""
+    file_elements: List[PageOCRElement] = Field(default_factory=list)
+
+
 class IngestResult(BaseModel):
     """
     Primary outputs for the rest of your system:
