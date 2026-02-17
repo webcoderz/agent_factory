@@ -50,3 +50,9 @@ class TodoToolset:
         if self.events:
             await self.events.emit(TaskEvent(name="task_created", task=t, payload={"parent_id": parent_id}))
         return t
+
+    async def next_runnable_tasks(self, q: TaskQuery) -> List[Task]:
+        return await self.store.next_runnable_tasks(q)
+
+    async def refresh_blocked_status(self, q: TaskQuery) -> int:
+        return await self.store.refresh_blocked_status(q)

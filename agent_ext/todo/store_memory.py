@@ -101,3 +101,59 @@ class InMemoryTaskStore:
             user_id=data.user_id or parent.user_id,
         )
         return await self.create_task(merged)
+    async def next_runnable_tasks(self, q: TaskQuery) -> List[Task]:
+        """
+        Runnable = status in {pending, in_progress} AND all dependencies are done.
+        (in_progress included so you can resume partially-run tasks)
+        """
+        tasks = await self.list_tasks(q)
+
+        # quick lookup
+        by_id = {t.id: t for t in tasks}
+        done = {"done"}
+
+        def deps_done(t: Task) -> bool:
+            for dep_id in t.depends_on:
+                dep = self._tasks.get(dep_id) or by_id.get(dep_id)
+                if not dep or dep.status not in done:
+                    return False
+            return True
+
+        runnable = []
+        for t in tasks:
+            if t.status not in {"pending", "in_progress"}:
+                continue
+            if deps_done(t):
+                runnable.append(t)
+
+        runnable.sort(key=lambda x: (x.priority, x.created_at))
+        return runnable[: q.limit]
+
+    async def refresh_blocked_status(self, q: TaskQuery) -> int:
+        """
+        Optionally keep statuses consistent:
+        - if deps not done and task is pending/in_progress => mark blocked
+        - if deps done and task is blocked => mark pending
+        Returns number of tasks updated.
+        """
+        tasks = await self.list_tasks(q)
+        by_id = {t.id: t for t in self._tasks.values()}
+        updated = 0
+
+        def deps_done(t: Task) -> bool:
+            for dep_id in t.depends_on:
+                dep = by_id.get(dep_id)
+                if not dep or dep.status != "done":
+                    return False
+            return True
+
+        for t in tasks:
+            ok = deps_done(t)
+            if not ok and t.status in {"pending", "in_progress"}:
+                await self.update_task(t.id, TaskPatch(status="blocked"))
+                updated += 1
+            elif ok and t.status == "blocked":
+                await self.update_task(t.id, TaskPatch(status="pending"))
+                updated += 1
+
+        return updated

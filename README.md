@@ -306,6 +306,136 @@ child = await toolset.add_subtask(parent_id="parent-id", data=TaskCreate(title="
 - **PostgresTaskStore** creates table `agent_tasks` and indexes on case_id, session_id, user_id, parent_id, status (requires **asyncpg**).
 - Attach **TodoToolset** to **ctx** (e.g. `ctx.todo = toolset`) so agent tools can create/list/update tasks scoped to the run.
 
+### Using Todo in an agent flow
+
+Use **TodoToolset** with **PydanticAIAgentBase**: set `ctx.todo = toolset` before runs, then in agent tools call `ctx.deps.todo` so the agent can create, list, update, and manage tasks scoped to the current run (case_id, session_id, user_id).
+
+**1. Setup: store, optional events, toolset, attach to context**
+
+```python
+from agent_ext import (
+    RunContext,
+    InMemoryTaskStore,
+    InProcessEventBus,
+    TodoToolset,
+    TaskCreate,
+    TaskPatch,
+    TaskQuery,
+)
+
+store = InMemoryTaskStore()
+bus = InProcessEventBus()
+toolset = TodoToolset(store, events=bus)
+
+ctx = RunContext(case_id="case-1", session_id="sess-1", user_id="user-1", policy=..., cache=..., logger=..., artifacts=...)
+ctx.todo = toolset
+```
+
+**2. Define an agent with todo tools (use `ctx.deps` = RunContext, `ctx.deps.todo` = TodoToolset)**
+
+```python
+from pydantic import BaseModel, Field
+from agent_ext import PydanticAIAgentBase, RunContext
+from agent_ext.todo.models import TaskCreate, TaskPatch, TaskQuery
+from pydantic_ai import RunContext as PAIRunContext
+
+class PlanOutput(BaseModel):
+    summary: str = Field(description="Brief summary of the plan")
+
+class PlannerAgent(PydanticAIAgentBase[PlanOutput]):
+    def __init__(self):
+        super().__init__(
+            "openai:gpt-4o-mini",
+            output_type=PlanOutput,
+            instructions="You help plan work by creating and updating tasks. Use the task tools to create, list, and update tasks.",
+        )
+
+# Tools receive pydantic-ai RunContext; ctx.deps is our RunContext, ctx.deps.todo is the TodoToolset
+agent = PlannerAgent()
+
+@agent.tool
+async def create_task(
+    ctx: PAIRunContext[RunContext],
+    title: str,
+    description: str = "",
+    priority: int = 50,
+    tags: str = "",
+) -> str:
+    """Create a task scoped to the current case/session/user."""
+    if not ctx.deps.todo:
+        return "Task system not available."
+    data = TaskCreate(
+        title=title,
+        description=description or None,
+        priority=priority,
+        tags=[t.strip() for t in tags.split(",") if t.strip()],
+        case_id=ctx.deps.case_id,
+        session_id=ctx.deps.session_id,
+        user_id=ctx.deps.user_id,
+    )
+    task = await ctx.deps.todo.create_task(data)
+    return f"Created task {task.id}: {task.title}"
+
+@agent.tool
+async def list_tasks(
+    ctx: PAIRunContext[RunContext],
+    status: str = "pending",
+    limit: int = 20,
+) -> str:
+    """List tasks for the current case/session."""
+    if not ctx.deps.todo:
+        return "Task system not available."
+    q = TaskQuery(
+        case_id=ctx.deps.case_id,
+        session_id=ctx.deps.session_id,
+        user_id=ctx.deps.user_id,
+        status=status if status in ("pending", "in_progress", "done", "blocked", "canceled", "failed") else None,
+        limit=limit,
+    )
+    tasks = await ctx.deps.todo.list_tasks(q)
+    if not tasks:
+        return "No tasks found."
+    lines = [f"- [{t.id}] {t.title} (status={t.status}, priority={t.priority})" for t in tasks]
+    return "\n".join(lines)
+
+@agent.tool
+async def update_task_status(
+    ctx: PAIRunContext[RunContext],
+    task_id: str,
+    status: str,
+) -> str:
+    """Update a task's status (e.g. in_progress, done)."""
+    if not ctx.deps.todo:
+        return "Task system not available."
+    patch = TaskPatch(status=status)
+    task = await ctx.deps.todo.update_task(task_id, patch)
+    if not task:
+        return f"Task {task_id} not found."
+    return f"Updated {task.id} to status={task.status}"
+```
+
+**3. Run the agent; it can create and manage tasks via the tools**
+
+```python
+# User asks for a plan; agent uses create_task / list_tasks / update_task_status
+result = agent.run_sync(
+    ctx,
+    "Create three tasks: (1) Research competitors, (2) Draft outline, (3) Review. Then list pending tasks.",
+)
+# result.output.summary, and tasks were created/listed via tool calls
+
+# Later: "Mark the first task as in progress"
+result2 = agent.run_sync(
+    ctx,
+    "Set 'Research competitors' to in progress.",
+    message_history=result.new_messages(),
+)
+```
+
+- Always scope **TaskCreate** and **TaskQuery** with `case_id=ctx.deps.case_id`, `session_id=ctx.deps.session_id`, `user_id=ctx.deps.user_id` so tasks belong to the current run.
+- Check `ctx.deps.todo` in tools if todo is optional (e.g. return a friendly message when not set).
+- For more operations (subtasks, dependencies), add tools that call `ctx.deps.todo.add_subtask(parent_id, TaskCreate(...))` and `ctx.deps.todo.add_dependency(task_id, depends_on_task_id)`.
+
 ---
 
 ## 10. Document ingest (PDF → OCR → Evidence)
@@ -414,6 +544,7 @@ result2 = agent.run_sync(ctx, "And in hex?", message_history=result1.new_message
 
 - **Tool calls and safe truncation**: history is truncated so **tool call pairs** are never split; use **message_kind**, **has_tool_calls**, **has_tool_returns**, **safe_truncate_messages** from **agent_ext.agent** when inspecting or trimming messages.
 - **Memory**: with `memory=` set, a history_processor runs **shape_messages** and **checkpoint** runs after each **run_sync** / **run**.
+- **Todo in the agent**: set `ctx.todo = TodoToolset(store, events=...)` and in tools use `ctx.deps.todo` to create/list/update tasks; see **§9 (Todo) → Using Todo in an agent flow** for a full example.
 
 ---
 

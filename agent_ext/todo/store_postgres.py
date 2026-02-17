@@ -225,3 +225,140 @@ class PostgresTaskStore:
             user_id=data.user_id or parent.user_id,
         )
         return await self.create_task(merged)
+
+    async def next_runnable_tasks(self, q: TaskQuery) -> List[Task]:
+        """
+        Postgres-side filter for runnable tasks:
+        - within tenant scope filters
+        - status in (pending, in_progress)
+        - all deps are done
+        """
+        # Build base filters like list_tasks, but we need dependency check.
+        clauses = []
+        args = []
+        i = 1
+
+        def add(cond: str, val):
+            nonlocal i
+            clauses.append(cond.replace("$", f"${i}"))
+            args.append(val)
+            i += 1
+
+        if q.case_id:
+            add("t.case_id = $", q.case_id)
+        if q.session_id:
+            add("t.session_id = $", q.session_id)
+        if q.user_id:
+            add("t.user_id = $", q.user_id)
+        if q.parent_id is not None:
+            add("t.parent_id = $", q.parent_id)
+        if q.tag:
+            add("$ = ANY(t.tags)", q.tag)
+        if q.text:
+            add("(LOWER(t.title) LIKE $ OR LOWER(COALESCE(t.description,'')) LIKE $)", f"%{q.text.lower()}%")
+            args.append(args[-1])
+            i += 1
+
+        # runnable statuses
+        clauses.append("t.status = ANY(ARRAY['pending','in_progress'])")
+
+        where = ("WHERE " + " AND ".join(clauses)) if clauses else ""
+
+        # Dependency condition:
+        # A task is runnable if there does NOT exist a dependency that is missing or not done.
+        # - unnest(depends_on) gives dep ids
+        # - left join to agent_tasks on dep id
+        # - if dep missing OR dep.status != 'done' => not runnable
+        sql = f"""
+        SELECT t.*
+        FROM agent_tasks t
+        {where}
+        AND NOT EXISTS (
+          SELECT 1
+          FROM unnest(t.depends_on) dep_id
+          LEFT JOIN agent_tasks d ON d.id = dep_id
+          WHERE d.id IS NULL OR d.status <> 'done'
+        )
+        ORDER BY t.priority ASC, t.created_at ASC
+        LIMIT {int(q.limit)} OFFSET {int(q.offset)}
+        """
+
+        async with self.pool.acquire() as conn:
+            rows = await conn.fetch(sql, *args)
+            return [_row_to_task(r) for r in rows]
+
+    async def refresh_blocked_status(self, q: TaskQuery) -> int:
+        """
+        Best-effort status normalization in Postgres:
+        - pending/in_progress -> blocked if deps incomplete
+        - blocked -> pending if deps satisfied
+        Returns number of rows updated.
+        """
+        clauses = []
+        args = []
+        i = 1
+
+        def add(cond: str, val):
+            nonlocal i
+            clauses.append(cond.replace("$", f"${i}"))
+            args.append(val)
+            i += 1
+
+        if q.case_id:
+            add("case_id = $", q.case_id)
+        if q.session_id:
+            add("session_id = $", q.session_id)
+        if q.user_id:
+            add("user_id = $", q.user_id)
+        if q.parent_id is not None:
+            add("parent_id = $", q.parent_id)
+        if q.tag:
+            add("$ = ANY(tags)", q.tag)
+        if q.text:
+            add("(LOWER(title) LIKE $ OR LOWER(COALESCE(description,'')) LIKE $)", f"%{q.text.lower()}%")
+            args.append(args[-1])
+            i += 1
+
+        where = ("WHERE " + " AND ".join(clauses)) if clauses else ""
+
+        # mark blocked: deps incomplete
+        # deps incomplete means EXISTS dep where missing or not done
+        mark_blocked_sql = f"""
+        UPDATE agent_tasks t
+        SET status='blocked', updated_at=NOW()
+        {where}
+        AND t.status = ANY(ARRAY['pending','in_progress'])
+        AND EXISTS (
+          SELECT 1
+          FROM unnest(t.depends_on) dep_id
+          LEFT JOIN agent_tasks d ON d.id = dep_id
+          WHERE d.id IS NULL OR d.status <> 'done'
+        )
+        """
+
+        # un-block: deps satisfied
+        un_block_sql = f"""
+        UPDATE agent_tasks t
+        SET status='pending', updated_at=NOW()
+        {where}
+        AND t.status = 'blocked'
+        AND NOT EXISTS (
+          SELECT 1
+          FROM unnest(t.depends_on) dep_id
+          LEFT JOIN agent_tasks d ON d.id = dep_id
+          WHERE d.id IS NULL OR d.status <> 'done'
+        )
+        """
+
+        async with self.pool.acquire() as conn:
+            r1 = await conn.execute(mark_blocked_sql, *args)
+            r2 = await conn.execute(un_block_sql, *args)
+
+        def _count(r: str) -> int:
+            # returns like "UPDATE 3"
+            try:
+                return int(r.split()[-1])
+            except Exception:
+                return 0
+
+        return _count(r1) + _count(r2)
