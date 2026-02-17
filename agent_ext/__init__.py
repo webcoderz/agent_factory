@@ -38,6 +38,12 @@ from .ingest.pipeline import IngestPipeline
 from .ingest.retry_planner import OCRRetryAction
 from .ingest.multi_extractor import MultiExtractor
 from .agent.base import PydanticAIAgentBase
+from .todo.models import Task, TaskCreate, TaskPatch, TaskQuery, TaskStatus
+from .todo.store_base import TaskStore
+from .todo.store_memory import InMemoryTaskStore
+from .todo.store_postgres import PostgresTaskStore
+from .todo.events import TaskEvent, TaskEventBus, InProcessEventBus, WebhookEventBus
+from .todo.toolset import TodoToolset
 
 __all__ = [
     "RunContext", "ToolCall", "ToolResult",
@@ -57,4 +63,8 @@ __all__ = [
     "OCRValidator", "OCRValidationPolicy", "ValidationEvidenceEmitter",
     "IngestPipeline", "OCRRetryAction", "MultiExtractor",
     "PydanticAIAgentBase",
+    "Task", "TaskCreate", "TaskPatch", "TaskQuery", "TaskStatus",
+    "TaskStore", "InMemoryTaskStore", "PostgresTaskStore",
+    "TaskEvent", "TaskEventBus", "InProcessEventBus", "WebhookEventBus",
+    "TodoToolset",
 ]

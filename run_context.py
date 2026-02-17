@@ -57,6 +57,7 @@ class RunContext:
     subagents: Any = None
     memory: Any = None
     rlm: Any = None
+    todo: Any = None  # TodoToolset for task CRUD
 
 
 @dataclass(frozen=True)

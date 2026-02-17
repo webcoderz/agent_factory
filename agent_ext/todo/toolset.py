@@ -1,0 +1,52 @@
+from __future__ import annotations
+
+from typing import Any, Dict, List, Optional
+
+from agent_ext.todo.models import Task, TaskCreate, TaskPatch, TaskQuery
+from agent_ext.todo.store_base import TaskStore
+from agent_ext.todo.events import TaskEvent, TaskEventBus
+
+
+class TodoToolset:
+    """
+    Provide CRUD + dependency/subtask helpers.
+    """
+    def __init__(self, store: TaskStore, *, events: Optional[TaskEventBus] = None) -> None:
+        self.store = store
+        self.events = events
+
+    async def create_task(self, data: TaskCreate) -> Task:
+        t = await self.store.create_task(data)
+        if self.events:
+            await self.events.emit(TaskEvent(name="task_created", task=t, payload={}))
+        return t
+
+    async def get_task(self, task_id: str) -> Optional[Task]:
+        return await self.store.get_task(task_id)
+
+    async def list_tasks(self, q: TaskQuery) -> List[Task]:
+        return await self.store.list_tasks(q)
+
+    async def update_task(self, task_id: str, patch: TaskPatch) -> Optional[Task]:
+        t = await self.store.update_task(task_id, patch)
+        if t and self.events:
+            payload: Dict[str, Any] = {"patch": patch.model_dump(exclude_unset=True)}
+            name = "task_updated"
+            if patch.status == "done":
+                name = "task_completed"
+            elif patch.status in {"failed", "canceled"}:
+                name = "task_terminal"
+            await self.events.emit(TaskEvent(name=name, task=t, payload=payload))
+        return t
+
+    async def add_dependency(self, task_id: str, depends_on_task_id: str) -> Optional[Task]:
+        t = await self.store.add_dependency(task_id, depends_on_task_id)
+        if t and self.events:
+            await self.events.emit(TaskEvent(name="task_updated", task=t, payload={"depends_on_added": depends_on_task_id}))
+        return t
+
+    async def add_subtask(self, parent_id: str, data: TaskCreate) -> Task:
+        t = await self.store.add_subtask(parent_id, data)
+        if self.events:
+            await self.events.emit(TaskEvent(name="task_created", task=t, payload={"parent_id": parent_id}))
+        return t
