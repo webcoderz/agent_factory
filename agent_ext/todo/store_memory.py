@@ -157,3 +157,26 @@ class InMemoryTaskStore:
                 updated += 1
 
         return updated
+
+    async def get_task_tree(self, root_task_id: str) -> Optional[dict]:
+        root = await self.get_task(root_task_id)
+        if not root:
+            return None
+
+        # build adjacency by parent_id
+        children_by_parent: dict[str, list[Task]] = {}
+        for t in self._tasks.values():
+            if t.parent_id:
+                children_by_parent.setdefault(t.parent_id, []).append(t)
+
+        for k in children_by_parent:
+            children_by_parent[k].sort(key=lambda x: (x.priority, x.created_at))
+
+        def build(node: Task) -> dict:
+            kids = children_by_parent.get(node.id, [])
+            return {
+                "task": node.model_dump(),
+                "children": [build(c) for c in kids],
+            }
+
+        return build(root)

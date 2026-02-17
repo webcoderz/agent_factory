@@ -362,3 +362,47 @@ class PostgresTaskStore:
                 return 0
 
         return _count(r1) + _count(r2)
+
+    async def get_task_tree(self, root_task_id: str) -> Optional[dict]:
+        """
+        Returns a nested tree:
+          {"task": <Task dict>, "children": [ ... ]}
+        Uses a recursive CTE to pull the entire subtree, then builds the tree in python.
+        """
+        async with self.pool.acquire() as conn:
+            rows = await conn.fetch(
+                """
+                WITH RECURSIVE tree AS (
+                  SELECT * FROM agent_tasks WHERE id=$1
+                  UNION ALL
+                  SELECT t.* FROM agent_tasks t
+                  JOIN tree p ON t.parent_id = p.id
+                )
+                SELECT * FROM tree
+                """,
+                root_task_id,
+            )
+
+        if not rows:
+            return None
+
+        tasks = [_row_to_task(r) for r in rows]
+        by_id = {t.id: t for t in tasks}
+        children_by_parent: dict[str, list[Task]] = {}
+
+        for t in tasks:
+            if t.parent_id:
+                children_by_parent.setdefault(t.parent_id, []).append(t)
+
+        for k in children_by_parent:
+            children_by_parent[k].sort(key=lambda x: (x.priority, x.created_at))
+
+        def build(task_id: str) -> dict:
+            node = by_id[task_id]
+            kids = children_by_parent.get(task_id, [])
+            return {
+                "task": node.model_dump(),
+                "children": [build(c.id) for c in kids],
+            }
+
+        return build(root_task_id)

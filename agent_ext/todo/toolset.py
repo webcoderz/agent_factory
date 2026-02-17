@@ -56,3 +56,6 @@ class TodoToolset:
 
     async def refresh_blocked_status(self, q: TaskQuery) -> int:
         return await self.store.refresh_blocked_status(q)
+
+    async def get_task_tree(self, root_task_id: str) -> Optional[dict]:
+        return await self.store.get_task_tree(root_task_id)
