@@ -16,3 +16,11 @@ class Hook(Protocol):
 
 class BlockedToolCall(RuntimeError):
     pass
+
+
+class BlockedPrompt(RuntimeError):
+    """Raise from a content filter to block a request before it reaches the LLM."""
+    def __init__(self, message: str, *, matched_rule: Optional[str] = None, details: Optional[Any] = None):
+        super().__init__(message)
+        self.matched_rule = matched_rule
+        self.details = details

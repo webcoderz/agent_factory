@@ -13,8 +13,8 @@ def _ensure_root_importable() -> None:
 _ensure_root_importable()
 
 from .run_context import RunContext, ToolCall, ToolResult
-from .hooks.base import Hook, BlockedToolCall
-from .hooks.builtins import AuditHook, PolicyHook
+from .hooks.base import Hook, BlockedToolCall, BlockedPrompt
+from .hooks.builtins import AuditHook, PolicyHook, ContentFilterHook, ContentFilterFn, make_blocklist_filter
 from .hooks.chain import HookChain
 from .evidence.models import Citation, Provenance, Evidence
 from .skills.models import SkillSpec, LoadedSkill
@@ -47,8 +47,8 @@ from .todo.toolset import TodoToolset
 
 __all__ = [
     "RunContext", "ToolCall", "ToolResult",
-    "Hook", "BlockedToolCall",
-    "AuditHook", "PolicyHook",
+    "Hook", "BlockedToolCall", "BlockedPrompt",
+    "AuditHook", "PolicyHook", "ContentFilterHook", "ContentFilterFn", "make_blocklist_filter",
     "HookChain",
     "Citation", "Provenance", "Evidence",
     "SkillSpec", "LoadedSkill",

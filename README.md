@@ -65,7 +65,7 @@ ctx.todo = todo_toolset  # TodoToolset(store, events=...) for task CRUD
 **Hooks** run at defined points around a run: before/after run, before/after model request/response, before/after tool call/result, and on error. Implement the `Hook` protocol and chain them.
 
 ```python
-from agent_ext import HookChain, AuditHook, PolicyHook, BlockedToolCall
+from agent_ext import HookChain, AuditHook, PolicyHook, ContentFilterHook, BlockedToolCall, BlockedPrompt, make_blocklist_filter
 
 # Built-in: logging and timing
 audit = AuditHook()
@@ -73,9 +73,16 @@ audit = AuditHook()
 # Built-in: enforce ctx.policy (e.g. block tools if allow_tools=False)
 policy = PolicyHook()
 
-chain = HookChain([audit, policy])
+# Block dangerous prompts before they reach the LLM (raises BlockedPrompt on match)
+DANGEROUS = ["ignore previous", "jailbreak", "disregard instructions"]  # your blocklist
+content_filter = ContentFilterHook(filter_fn=make_blocklist_filter(DANGEROUS, reason="Prompt blocked by policy"))
+# Or custom filter that can raise BlockedPrompt or redact:
+# def my_filter(ctx, payload, phase): ...
+# content_filter = ContentFilterHook(filter_fn=my_filter)
 
-# In your agent loop:
+chain = HookChain([audit, content_filter, policy])
+
+# In your agent loop (catch BlockedPrompt so dangerous prompts never reach the LLM):
 chain.before_run(ctx)
 try:
     request = chain.before_model_request(ctx, request)
@@ -83,13 +90,17 @@ try:
     response = chain.after_model_response(ctx, response)
     # ... tool calls: chain.before_tool_call(ctx, call), chain.after_tool_result(ctx, result)
     outcome = ...
+except BlockedPrompt as e:
+    outcome = "I can't process that request."  # or your safe fallback; no LLM call
 except Exception as e:
     outcome = chain.on_error(ctx, e)
 chain.after_run(ctx, outcome)
 ```
 
 - **BlockedToolCall**: raised by PolicyHook when a tool is disallowed; handle it in your runner.
-- **Custom hooks**: implement `Hook` (e.g. rate limiting, redaction, metrics) and prepend/append to the chain.
+- **BlockedPrompt**: raise from a content filter to **block the request before it reaches the LLM**. The runner should catch it and not call the model (e.g. return a safe message). Use **make_blocklist_filter(patterns, reason=...)** to block requests whose text matches any pattern (substring or regex).
+- **ContentFilterHook**: runs your `filter_fn` on every **before_model_request** (so blocking works always) and on **after_model_response** when `ctx.policy.redaction_level` is not `"none"`. Filter can return modified payload or raise **BlockedPrompt** to block the request before it reaches the LLM. Use for blocklists, PII redaction, or moderation APIs.
+- **Custom hooks**: implement `Hook` (e.g. rate limiting, metrics) and prepend/append to the chain.
 
 ---
 
@@ -643,7 +654,7 @@ chain.after_run(ctx, result)
 | Area | Import from | Key types |
 |------|-------------|-----------|
 | Context | `agent_ext` or `agent_patterns.run_context` | RunContext, ToolCall, ToolResult, Policy |
-| Hooks | `agent_ext` | Hook, BlockedToolCall, AuditHook, PolicyHook, HookChain |
+| Hooks | `agent_ext` | Hook, BlockedToolCall, BlockedPrompt, AuditHook, PolicyHook, ContentFilterHook, ContentFilterFn, make_blocklist_filter, HookChain |
 | Evidence | `agent_ext` | Citation, Provenance, Evidence |
 | Skills | `agent_ext` | SkillSpec, LoadedSkill, SkillRegistry |
 | Backends | `agent_ext` | LocalFilesystemBackend, LocalSubprocessExecBackend |
