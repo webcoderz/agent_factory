@@ -6,6 +6,14 @@ Shared patterns and extensions for building AI agents: **RunContext**, **hooks**
 
 ## Setup
 
+**Optional dependency (pydantic-ai):** The core package does **not** depend on `pydantic-ai`, so you can use agent_patterns (hooks, todo, ingest, evidence, etc.) without pulling in pydantic-ai or its transitive deps (e.g. Starlette). If your app **already has** pydantic-ai installed, **PydanticAIAgentBase** and **LLMVisionOCREngine** will use your version when you import them. If you need the agent/vision OCR and don’t have pydantic-ai yet, install the extra:
+
+```bash
+pip install agent-patterns[agent]
+# or
+uv add "agent-patterns[agent]"
+```
+
 Put the **parent** of this repo on `PYTHONPATH`:
 
 ```bash

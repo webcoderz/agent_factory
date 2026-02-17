@@ -31,15 +31,24 @@ from .rlm.python_runner import run_restricted_python
 from .ingest.models import DocumentInput, IngestResult, PageImage, OCRPage, OCRSpan, PageOCROutput, PageOCRElement
 from .ingest.pdf_to_images import PDFToImages
 from .ingest.ocr_engines import OCREngine
-from .ingest.llm_ocr_engine import LLMVisionOCREngine
 from .ingest.extractors import PageExtractor
 from .ingest.validation import OCRValidator, OCRValidationPolicy
 from .ingest.validation_evidence import ValidationEvidenceEmitter
 from .ingest.pipeline import IngestPipeline
 from .ingest.retry_planner import OCRRetryAction
 from .ingest.multi_extractor import MultiExtractor
-from .agent.base import PydanticAIAgentBase
 from .todo.models import Task, TaskCreate, TaskPatch, TaskQuery, TaskStatus
+
+# Optional: pydantic-ai (agent + vision OCR). Omit from core deps to avoid version/Starlette conflicts.
+# If your app already has pydantic-ai, these will use it; else install with: pip install agent-patterns[agent]
+try:
+    from .ingest.llm_ocr_engine import LLMVisionOCREngine
+except ImportError:
+    LLMVisionOCREngine = None  # type: ignore[misc, assignment]
+try:
+    from .agent.base import PydanticAIAgentBase
+except ImportError:
+    PydanticAIAgentBase = None  # type: ignore[misc, assignment]
 from .todo.store_base import TaskStore
 from .todo.store_memory import InMemoryTaskStore
 from .todo.store_postgres import PostgresTaskStore
@@ -60,12 +69,15 @@ __all__ = [
     "SubagentOrchestrator", "SubagentRegistry",
     "RLMPolicy", "run_restricted_python",
     "DocumentInput", "IngestResult", "PageImage", "OCRPage", "OCRSpan", "PageOCROutput", "PageOCRElement",
-    "PDFToImages", "OCREngine", "LLMVisionOCREngine", "PageExtractor",
+    "PDFToImages", "OCREngine", "PageExtractor",
     "OCRValidator", "OCRValidationPolicy", "ValidationEvidenceEmitter",
     "IngestPipeline", "OCRRetryAction", "MultiExtractor",
-    "PydanticAIAgentBase",
     "Task", "TaskCreate", "TaskPatch", "TaskQuery", "TaskStatus",
     "TaskStore", "InMemoryTaskStore", "PostgresTaskStore",
     "TaskEvent", "TaskEventBus", "InProcessEventBus", "WebhookEventBus",
     "TodoToolset",
 ]
+if LLMVisionOCREngine is not None:
+    __all__.append("LLMVisionOCREngine")
+if PydanticAIAgentBase is not None:
+    __all__.append("PydanticAIAgentBase")
