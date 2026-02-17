@@ -4,7 +4,7 @@ from typing import Any, Dict, List, Tuple
 
 from .base import SubagentResult
 from .registry import SubagentRegistry
-from ...types import RunContext
+from agent_ext.run_context import RunContext
 
 
 class SubagentOrchestrator:

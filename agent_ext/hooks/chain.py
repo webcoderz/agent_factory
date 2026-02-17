@@ -2,7 +2,7 @@ from __future__ import annotations
 from typing import Any, List, Optional
 
 from .base import Hook
-from ...types import RunContext, ToolCall, ToolResult
+from agent_ext.run_context import RunContext, ToolCall, ToolResult
 
 
 class HookChain:

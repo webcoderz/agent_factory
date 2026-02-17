@@ -3,7 +3,7 @@ import hashlib
 import os
 from typing import Dict, List
 
-from models import SkillSpec
+from .models import SkillSpec
 
 
 def _hash_text(s: str) -> str:

@@ -2,8 +2,8 @@ from __future__ import annotations
 from typing import Any, Optional
 import time
 
-from base import BlockedToolCall, Hook
-from ...types import RunContext, ToolCall, ToolResult
+from .base import BlockedToolCall, Hook
+from agent_ext.run_context import RunContext, ToolCall, ToolResult
 
 
 class AuditHook(Hook):

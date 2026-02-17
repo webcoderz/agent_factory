@@ -1,5 +1,18 @@
 from __future__ import annotations
-from types import RunContext, ToolCall, ToolResult
+
+# Ensure root package is importable when run from repo root (e.g. uv run python main.py)
+def _ensure_root_importable() -> None:
+    import sys
+    from pathlib import Path
+    _root = Path(__file__).resolve().parent.parent
+    _parent = _root.parent
+    if _parent not in (Path(p).resolve() for p in sys.path):
+        sys.path.insert(0, str(_parent))
+
+
+_ensure_root_importable()
+
+from .run_context import RunContext, ToolCall, ToolResult
 from .hooks.base import Hook, BlockedToolCall
 from .hooks.builtins import AuditHook, PolicyHook
 from .hooks.chain import HookChain
@@ -24,8 +37,7 @@ from .ingest.validation_evidence import ValidationEvidenceEmitter
 from .ingest.pipeline import IngestPipeline
 from .ingest.retry_planner import OCRRetryAction
 from .ingest.multi_extractor import MultiExtractor
-
-
+from .agent.base import PydanticAIAgentBase
 
 __all__ = [
     "RunContext", "ToolCall", "ToolResult",
@@ -44,4 +56,5 @@ __all__ = [
     "PDFToImages", "OCREngine", "PageExtractor",
     "OCRValidator", "OCRValidationPolicy", "ValidationEvidenceEmitter",
     "IngestPipeline", "OCRRetryAction", "MultiExtractor",
+    "PydanticAIAgentBase",
 ]

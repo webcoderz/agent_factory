@@ -1,7 +1,7 @@
 from __future__ import annotations
 from typing import List, Protocol
 
-from ...types import RunContext
+from agent_ext.run_context import RunContext
 from .models import OCRPage, PageImage
 
 

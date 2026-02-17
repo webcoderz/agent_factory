@@ -2,7 +2,7 @@ from __future__ import annotations
 from typing import Any, Dict, List, Optional, Tuple
 from pydantic import BaseModel, Field
 
-from ..evidence.models import Citation, Evidence, Provenance
+from agent_ext.evidence.models import Citation, Evidence, Provenance
 
 
 class DocumentInput(BaseModel):

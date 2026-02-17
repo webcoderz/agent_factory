@@ -2,9 +2,9 @@ from __future__ import annotations
 
 from typing import List, Optional
 
-from ..evidence.models import Evidence, Provenance, Citation
-from validation import OCRValidationReport, ValidationIssue
-from ...types import RunContext
+from agent_ext.evidence.models import Evidence, Provenance, Citation
+from .validation import OCRValidationReport, ValidationIssue
+from agent_ext.run_context import RunContext
 
 
 class ValidationEvidenceEmitter:

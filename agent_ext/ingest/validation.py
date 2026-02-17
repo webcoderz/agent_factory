@@ -5,7 +5,7 @@ from typing import Any, Dict, List, Optional, Protocol, Tuple
 
 from pydantic import BaseModel, Field, ValidationError
 
-from models import OCRPage, OCRSpan, PageImage
+from .models import OCRPage, OCRSpan, PageImage
 
 
 # ----------------------------

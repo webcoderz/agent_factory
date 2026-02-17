@@ -1,3 +1,7 @@
+"""
+Run context and shared types for agent_patterns.
+Named run_context to avoid shadowing the stdlib 'types' module.
+"""
 from __future__ import annotations
 
 from dataclasses import dataclass, field

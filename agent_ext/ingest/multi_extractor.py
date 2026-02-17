@@ -1,9 +1,11 @@
+from __future__ import annotations
+
 from typing import List
 
-from extractors import PageExtractor
-from ..evidence.models import Evidence
-from models import OCRPage
-from ...types import RunContext
+from .extractors import PageExtractor
+from .models import OCRPage
+from agent_ext.evidence.models import Evidence
+from agent_ext.run_context import RunContext
 
 
 class MultiExtractor:

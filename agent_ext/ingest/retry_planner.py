@@ -3,7 +3,7 @@ from __future__ import annotations
 from dataclasses import dataclass
 from typing import Any, Dict, List, Optional, Sequence, Set, Tuple
 
-from ..evidence.models import Evidence
+from agent_ext.evidence.models import Evidence
 
 
 @dataclass(frozen=True)

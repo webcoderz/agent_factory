@@ -6,7 +6,7 @@ from typing import Any, Callable, Dict, List, Optional, Tuple
 from pydantic import BaseModel, Field
 
 from .base import MemoryManager
-from ...types import RunContext
+from agent_ext.run_context import RunContext
 
 
 class Dossier(BaseModel):

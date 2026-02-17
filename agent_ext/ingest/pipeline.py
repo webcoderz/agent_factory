@@ -1,7 +1,7 @@
 from __future__ import annotations
 from typing import List, Optional
 
-from ...types import RunContext
+from agent_ext.run_context import RunContext
 from .models import DocumentInput, IngestResult
 from .pdf_to_images import PDFToImages
 from .ocr_engines import OCREngine
@@ -42,10 +42,8 @@ class IngestPipeline:
         if self.validator:
             report = self.validator.validate_pages(page_images=page_images, ocr_pages=ocr_pages)
             ctx.logger.info("ocr.validation", ok=report.ok, metrics=report.metrics, trace_id=ctx.trace_id)
-            report.raise_if_failed()
-
-        if self.fail_fast_on_validation:
-            report.raise_if_failed()
+            if self.fail_fast_on_validation:
+                report.raise_if_failed()
         # 3) Extract → Evidence
         evidence = self.extractor.extract(
             ctx, 

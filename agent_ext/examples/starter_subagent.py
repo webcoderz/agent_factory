@@ -1,7 +1,7 @@
 from __future__ import annotations
 from typing import Any, Dict
 
-from ..subagents.base import SubagentResult
+from agent_ext.subagents.base import SubagentResult
 
 
 class LocalKGShapeProposer:

@@ -3,9 +3,9 @@ from typing import Any, Dict, List, Protocol, Type
 
 from pydantic import BaseModel
 
-from ...types import RunContext
+from agent_ext.run_context import RunContext
 from .models import OCRPage
-from ..evidence.models import Evidence, Provenance, Citation
+from agent_ext.evidence.models import Evidence, Provenance, Citation
 
 
 class PageExtractor(Protocol):
