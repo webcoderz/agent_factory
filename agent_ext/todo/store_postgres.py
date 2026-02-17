@@ -363,12 +363,7 @@ class PostgresTaskStore:
 
         return _count(r1) + _count(r2)
 
-    async def get_task_tree(self, root_task_id: str) -> Optional[dict]:
-        """
-        Returns a nested tree:
-          {"task": <Task dict>, "children": [ ... ]}
-        Uses a recursive CTE to pull the entire subtree, then builds the tree in python.
-        """
+    async def get_task_tree(self, root_task_id: str, include_rollup: bool = False) -> Optional[dict]:
         async with self.pool.acquire() as conn:
             rows = await conn.fetch(
                 """
@@ -388,8 +383,8 @@ class PostgresTaskStore:
 
         tasks = [_row_to_task(r) for r in rows]
         by_id = {t.id: t for t in tasks}
-        children_by_parent: dict[str, list[Task]] = {}
 
+        children_by_parent: dict[str, list[Task]] = {}
         for t in tasks:
             if t.parent_id:
                 children_by_parent.setdefault(t.parent_id, []).append(t)
@@ -397,12 +392,50 @@ class PostgresTaskStore:
         for k in children_by_parent:
             children_by_parent[k].sort(key=lambda x: (x.priority, x.created_at))
 
+        def deps_blockers(t: Task) -> list[str]:
+            blockers = []
+            for dep_id in t.depends_on:
+                dep = by_id.get(dep_id)
+                if not dep or dep.status != "done":
+                    blockers.append(dep_id)
+            return blockers
+
         def build(task_id: str) -> dict:
             node = by_id[task_id]
             kids = children_by_parent.get(task_id, [])
-            return {
-                "task": node.model_dump(),
-                "children": [build(c.id) for c in kids],
-            }
+            out = {"task": node.model_dump(), "children": [build(c.id) for c in kids]}
+
+            if include_rollup:
+                blocked_by = deps_blockers(node)
+                is_terminal = node.status in {"done", "canceled", "failed"}
+                is_runnable = (node.status in {"pending", "in_progress"}) and not blocked_by
+
+                totals = {"total": 1, "done": 1 if node.status == "done" else 0,
+                          "blocked": 1 if (node.status == "blocked" or blocked_by) else 0,
+                          "failed": 1 if node.status == "failed" else 0,
+                          "open": 0 if is_terminal else 1}
+
+                for ch in out["children"]:
+                    r = ch.get("rollup") or {}
+                    totals["total"] += r.get("subtree_total", 0)
+                    totals["done"] += r.get("subtree_done", 0)
+                    totals["blocked"] += r.get("subtree_blocked", 0)
+                    totals["failed"] += r.get("subtree_failed", 0)
+                    totals["open"] += r.get("subtree_open", 0)
+
+                progress_pct = (totals["done"] / max(1, totals["total"])) * 100.0
+
+                out["rollup"] = {
+                    "is_runnable": is_runnable,
+                    "blocked_by": blocked_by,
+                    "subtree_total": totals["total"],
+                    "subtree_done": totals["done"],
+                    "subtree_open": totals["open"],
+                    "subtree_blocked": totals["blocked"],
+                    "subtree_failed": totals["failed"],
+                    "progress_pct": round(progress_pct, 2),
+                }
+
+            return out
 
         return build(root_task_id)

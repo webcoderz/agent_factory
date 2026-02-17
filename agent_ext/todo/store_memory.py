@@ -158,7 +158,7 @@ class InMemoryTaskStore:
 
         return updated
 
-    async def get_task_tree(self, root_task_id: str) -> Optional[dict]:
+    async def get_task_tree(self, root_task_id: str, include_rollup: bool = False) -> Optional[dict]:
         root = await self.get_task(root_task_id)
         if not root:
             return None
@@ -172,11 +172,52 @@ class InMemoryTaskStore:
         for k in children_by_parent:
             children_by_parent[k].sort(key=lambda x: (x.priority, x.created_at))
 
+        by_id = {t.id: t for t in self._tasks.values()}
+
+        def deps_blockers(t: Task) -> list[str]:
+            blockers = []
+            for dep_id in t.depends_on:
+                dep = by_id.get(dep_id)
+                if not dep or dep.status != "done":
+                    blockers.append(dep_id)
+            return blockers
+
         def build(node: Task) -> dict:
             kids = children_by_parent.get(node.id, [])
-            return {
-                "task": node.model_dump(),
-                "children": [build(c) for c in kids],
-            }
+            out = {"task": node.model_dump(), "children": [build(c) for c in kids]}
+
+            if include_rollup:
+                blocked_by = deps_blockers(node)
+                is_terminal = node.status in {"done", "canceled", "failed"}
+                is_runnable = (node.status in {"pending", "in_progress"}) and not blocked_by
+
+                # subtree stats
+                totals = {"total": 1, "done": 1 if node.status == "done" else 0,
+                          "blocked": 1 if (node.status == "blocked" or blocked_by) else 0,
+                          "failed": 1 if node.status == "failed" else 0,
+                          "open": 0 if is_terminal else 1}
+
+                for ch in out["children"]:
+                    r = ch.get("rollup") or {}
+                    totals["total"] += r.get("total", 0)
+                    totals["done"] += r.get("done", 0)
+                    totals["blocked"] += r.get("blocked", 0)
+                    totals["failed"] += r.get("failed", 0)
+                    totals["open"] += r.get("open", 0)
+
+                progress_pct = (totals["done"] / max(1, totals["total"])) * 100.0
+
+                out["rollup"] = {
+                    "is_runnable": is_runnable,
+                    "blocked_by": blocked_by,
+                    "subtree_total": totals["total"],
+                    "subtree_done": totals["done"],
+                    "subtree_open": totals["open"],
+                    "subtree_blocked": totals["blocked"],
+                    "subtree_failed": totals["failed"],
+                    "progress_pct": round(progress_pct, 2),
+                }
+
+            return out
 
         return build(root)
