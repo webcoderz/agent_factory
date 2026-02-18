@@ -20,7 +20,7 @@ def _ensure_root_importable() -> None:
 
 _ensure_root_importable()
 
-from agent_patterns.run_context import (
+from agent_ext.run_context import (
     ArtifactStore,
     Cache,
     Logger,

@@ -141,7 +141,6 @@ async def run_next_task(ctx) -> str:
             if ctx.model and Agent is not None:
                 async with ctx.model_limiter:
                     agent = Agent(model=ctx.model)
-                    agent = agent.with_retries(0)
                     result = await agent.run(
                         f"Clarify this goal into a short, concrete one-paragraph spec (what to build, what success looks like). Goal: {goal}"
                     )
@@ -175,7 +174,6 @@ async def run_next_task(ctx) -> str:
             if ctx.model and Agent is not None:
                 async with ctx.model_limiter:
                     agent = Agent(model=ctx.model)
-                    agent = agent.with_retries(0)
                     result = await agent.run(
                         f"Goal: {goal}\n{spec}\n{files_ctx}\n\n"
                         "Output a short approach (2-3 sentences) then a JSON array of file changes. "

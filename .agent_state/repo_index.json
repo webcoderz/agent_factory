@@ -814,9 +814,9 @@
       "skipped": false
     },
     "agent_ext/workbench/loop.py": {
-      "sha256": "0cc56a338c40b47f1308b75dcb4a9857e6fa22164ceceeb5f8dabef45b524655",
-      "size": 2338,
-      "mtime": 1771447806.1539881,
+      "sha256": "56e83c00346706c76d4d4872be04fbc89c799806dfcee5fa847fbe253fc6d15f",
+      "size": 9921,
+      "mtime": 1771449222.46351,
       "lang": "python",
       "skipped": false
     },
@@ -842,9 +842,9 @@
       "skipped": false
     },
     "agent_ext/workbench/runtime.py": {
-      "sha256": "382a484c05c2e4660d419f1b8100880e551d18c89c3def4668b0fcc20fd0f9fe",
-      "size": 4097,
-      "mtime": 1771447509.6193562,
+      "sha256": "95b1077474d82f347aeb2d6d59099eb0ec1307d3ee2a8815a241b9a07950bbf0",
+      "size": 4634,
+      "mtime": 1771448467.507977,
       "lang": "python",
       "skipped": false
     },
@@ -863,9 +863,9 @@
       "skipped": false
     },
     "agent_ext/workbench/tui_async.py": {
-      "sha256": "873475124aa32a64c84eda06b3a3212b7f8366ac344d0dcc1bb00532bbdfd783",
-      "size": 6038,
-      "mtime": 1771447510.9959862,
+      "sha256": "15dcb52b575676cee97f1c568dc32df311bbc112fce4d9f8fbe7a124c2c8980f",
+      "size": 6591,
+      "mtime": 1771448934.6056058,
       "lang": "python",
       "skipped": false
     },
@@ -992,6 +992,20 @@
       "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
       "size": 0,
       "mtime": 1771444334.7177322,
+      "lang": "python",
+      "skipped": false
+    },
+    "agent_ext/workbench/subagents_bm25.py": {
+      "sha256": "5cde2442ce819a55852a095f45d6ef0b0d922b404604665731757d6b85669155",
+      "size": 706,
+      "mtime": 1771448393.5953448,
+      "lang": "python",
+      "skipped": false
+    },
+    "agent_ext/workbench/subagents_patch.py": {
+      "sha256": "1e7ac1efcf7ef08aa3ddcf69fa49f35f5482f43f3186cbf0dfc1f4682c973c42",
+      "size": 2873,
+      "mtime": 1771448487.3811526,
       "lang": "python",
       "skipped": false
     }

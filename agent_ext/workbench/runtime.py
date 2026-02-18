@@ -11,6 +11,7 @@ from agent_ext.run_context import RunContext, Policy
 from .limits import ModelLimiter
 from .planner import TaskQueue
 from .subagents import SubagentOrchestrator, SubagentRegistry, RepoGrepSubagent, PlannerSubagent
+from .subagents_patch import LLMPatchSubagent
 from agent_ext.workflow.registry import Registry as WorkflowRegistry
 from agent_ext.workflow.builtins import register_builtins as register_workflow_builtins
 from agent_ext.workflow.experience import ExperienceStore
@@ -79,6 +80,7 @@ def build_ctx(
     reg.register(PlannerSubagent())
     reg.register(RepoGrepSubagent())
     reg.register(BM25SearchSubagent())
+    reg.register(LLMPatchSubagent())
     ctx.subagents = reg
     ctx.orchestrator = SubagentOrchestrator(reg)
 
