@@ -34,9 +34,9 @@ def model_from_env(prefix: str = "LLM_") -> ModelConfig:
 
 def build_openai_chat_model(cfg: ModelConfig) -> Any:
     """
-    Returns OpenAIChatModel(model=..., provider=OpenAIProvider(base_url=..., api_key=...))
+    Returns OpenAIChatModel(model_name, provider=OpenAIProvider(base_url=..., api_key=...))
     """
     if OpenAIChatModel is None or OpenAIProvider is None:
         raise RuntimeError("pydantic-ai not installed. Install agent-patterns[agent] or pydantic-ai.")
     provider = OpenAIProvider(base_url=cfg.base_url, api_key=cfg.api_key)
-    return OpenAIChatModel(model=cfg.model, provider=provider)
+    return OpenAIChatModel(cfg.model, provider=provider)
