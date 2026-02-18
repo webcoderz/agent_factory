@@ -9,6 +9,7 @@ dependencies = [
     "httpx>=0.28.1",
     "pdf2img>=0.1.2",
     "pydantic>=2.12.5",
+    "rich>=14.3.2",
 ]
 [project.optional-dependencies]
 # Install with: pip install agent-patterns[agent] or uv add "agent-patterns[agent]"

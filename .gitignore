@@ -205,3 +205,65 @@ cython_debug/
 marimo/_static/
 marimo/_lsp/
 __marimo__/
+
+
+# -------------------------
+# Python
+# -------------------------
+__pycache__/
+*.pyc
+*.pyo
+*.pyd
+.pytest_cache/
+.mypy_cache/
+.ruff_cache/
+.coverage
+htmlcov/
+dist/
+build/
+*.egg-info/
+
+# -------------------------
+# OS / editor
+# -------------------------
+.DS_Store
+.vscode/
+.idea/
+
+# -------------------------
+# Agent state: default ignore everything
+# -------------------------
+.agent_state/**
+
+# Keep curated "brain" files
+!.agent_state/README.md
+!.agent_state/registry.json
+!.agent_state/budgets.json
+!.agent_state/triggers.json
+!.agent_state/failure_fingerprints.json
+!.agent_state/repo_index.json
+!.agent_state/workflow_experience.json
+!.agent_state/strategy_scores.json
+!.agent_state/modules_history.json
+
+# Keep directory placeholders
+!.agent_state/runs/.gitkeep
+!.agent_state/locks/.gitkeep
+
+# Ignore heavy/volatile stuff
+.agent_state/runs/**
+.agent_state/worktrees/**
+.agent_state/tmp/**
+.agent_state/workspaces/**
+.agent_state/*.log
+.agent_state/**/*.patch
+.agent_state/**/*.diff
+
+# If you later add embeddings/vector caches locally:
+.agent_state/embeddings/**
+.agent_state/bm25_cache/**
+
+# -------------------------
+# Docker
+# -------------------------
+*.pid

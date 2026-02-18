@@ -1,0 +1,25 @@
+services:
+  workbench:
+    build:
+      context: .
+      dockerfile: docker/Dockerfile
+    working_dir: /repo
+    volumes:
+      - ./:/repo
+      - ./.agent_state:/repo/.agent_state
+    environment:
+
+      - HTTP_PROXY=${HTTP_PROXY}
+      - http_proxy=${http_proxy}
+      - HTTPS_PROXY=${HTTPS_PROXY}
+      - https_proxy=${https_proxy}
+      - NO_PROXY=${NO_PROXY}
+      - no_proxy=${no_proxy}
+      - REQUESTS_CA_BUNDLE=${REQUESTS_CA_BUNDLE}
+      - SSL_CERT_FILE=${SSL_CERT_FILE}
+
+      # point to your local OpenAI-compatible server
+      - LLM_BASE_URL=${LLM_BASE_URL:-http://host.docker.internal:8000/v1}
+      - LLM_API_KEY=${LLM_API_KEY:-local}
+      - LLM_MODEL=${LLM_MODEL:-gpt-oss-120b}
+    command: ["python", "-m", "agent_ext.workbench", "--use-openai-chat-model"]
