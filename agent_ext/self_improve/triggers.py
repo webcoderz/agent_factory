@@ -17,9 +17,16 @@ class TriggerStore:
         self._load()
 
     def _load(self) -> None:
-        if self.path.exists():
-            self._data = json.loads(self.path.read_text(encoding="utf-8"))
-        else:
+        if not self.path.exists():
+            self._data = {}
+            return
+        try:
+            raw = self.path.read_text(encoding="utf-8").strip()
+            if not raw:
+                self._data = {}
+                return
+            self._data = json.loads(raw)
+        except (json.JSONDecodeError, OSError):
             self._data = {}
 
     def save(self) -> None:

@@ -1,16 +1,21 @@
 from __future__ import annotations
 
 import argparse
+import asyncio
+import os
+
+from dotenv import find_dotenv, load_dotenv
 
 from agent_ext.workbench.models import build_openai_chat_model, model_from_env
 from agent_ext.workbench.runtime import build_ctx
 from agent_ext.workbench.tui_async import run_tui
 
-import asyncio
-import os
+# Load .env from cwd or any parent (so running from repo root finds .env)
+load_dotenv(find_dotenv())
 
 max_sub = int(os.getenv("MAX_PARALLEL_SUBAGENTS", "4"))
 max_llm = int(os.getenv("MAX_PARALLEL_MODEL_CALLS", "2"))
+
 
 def main() -> None:
     ap = argparse.ArgumentParser()

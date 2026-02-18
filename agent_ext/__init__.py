@@ -44,7 +44,10 @@ from .export.base import Exporter
 from .export.html_writer import HtmlExporter
 from .export.docx_writer import DocxExporter
 from .export.pdf_writer import PdfExporter
-from .export.pptx_writer import PptxExporter
+try:
+    from .export.pptx_writer import PptxExporter
+except ImportError:
+    PptxExporter = None  # type: ignore[misc, assignment]
 
 
 # Optional: pydantic-ai (agent + vision OCR). Omit from core deps to avoid version/Starlette conflicts.

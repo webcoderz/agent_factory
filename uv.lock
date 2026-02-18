@@ -23,6 +23,8 @@ dependencies = [
     { name = "httpx" },
     { name = "pdf2img" },
     { name = "pydantic" },
+    { name = "python-dotenv" },
+    { name = "python-pptx" },
     { name = "rich" },
 ]
 
@@ -32,7 +34,6 @@ agent = [
 ]
 docs = [
     { name = "python-docx" },
-    { name = "python-pptx" },
     { name = "reportlab" },
 ]
 
@@ -44,7 +45,9 @@ requires-dist = [
     { name = "pydantic", specifier = ">=2.12.5" },
     { name = "pydantic-ai", marker = "extra == 'agent'", specifier = ">=1.60.0" },
     { name = "python-docx", marker = "extra == 'docs'", specifier = ">=1.2.0" },
-    { name = "python-pptx", marker = "extra == 'docs'", specifier = ">=1.0.2" },
+    { name = "python-dotenv", specifier = ">=1.0.0" },
+    { name = "python-dotenv", specifier = ">=1.2.1" },
+    { name = "python-pptx", specifier = ">=1.0.2" },
     { name = "reportlab", marker = "extra == 'docs'", specifier = ">=4.4.10" },
     { name = "rich", specifier = ">=14.3.2" },
 ]

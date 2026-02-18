@@ -19,13 +19,24 @@ def _bucket(req: TaskRequest) -> str:
 class ExperienceStore:
     path: Path = EXP_FILE
 
+    def _read_data(self) -> dict:
+        if not self.path.exists():
+            return {"buckets": {}}
+        try:
+            raw = self.path.read_text(encoding="utf-8").strip()
+            if not raw:
+                return {"buckets": {}}
+            return json.loads(raw)
+        except (json.JSONDecodeError, OSError):
+            return {"buckets": {}}
+
     def __post_init__(self):
         self.path.parent.mkdir(parents=True, exist_ok=True)
         if not self.path.exists():
             self.path.write_text(json.dumps({"buckets": {}}, indent=2), encoding="utf-8")
 
     def record(self, req: TaskRequest, result: ExecutionResult, reward: float) -> None:
-        data = json.loads(self.path.read_text(encoding="utf-8"))
+        data = self._read_data()
         b = _bucket(req)
         data["buckets"].setdefault(b, [])
         data["buckets"][b].append({
@@ -37,5 +48,5 @@ class ExperienceStore:
         self.path.write_text(json.dumps(data, indent=2), encoding="utf-8")
 
     def get_bucket_stats(self, req: TaskRequest) -> List[Dict]:
-        data = json.loads(self.path.read_text(encoding="utf-8"))
+        data = self._read_data()
         return data.get("buckets", {}).get(_bucket(req), [])

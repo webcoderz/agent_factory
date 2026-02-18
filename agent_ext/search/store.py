@@ -14,7 +14,13 @@ BM25_META_FILE = STATE_DIR / "bm25_meta.json"
 def read_json(path: Path, default: Any) -> Any:
     if not path.exists():
         return default
-    return json.loads(path.read_text(encoding="utf-8"))
+    try:
+        raw = path.read_text(encoding="utf-8").strip()
+        if not raw:
+            return default
+        return json.loads(raw)
+    except (json.JSONDecodeError, OSError):
+        return default
 
 
 def write_json(path: Path, obj: Any) -> None:

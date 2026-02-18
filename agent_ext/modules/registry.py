@@ -74,7 +74,13 @@ class ModuleRegistry:
     def load_saved(self) -> Dict[str, bool]:
         if not self.state_file.exists():
             return {}
-        data = json.loads(self.state_file.read_text(encoding="utf-8"))
+        try:
+            raw = self.state_file.read_text(encoding="utf-8").strip()
+            if not raw:
+                return {}
+            data = json.loads(raw)
+        except (json.JSONDecodeError, OSError):
+            return {}
         out: Dict[str, bool] = {}
         for item in data.get("modules", []):
             out[item["name"]] = bool(item.get("enabled", True))
