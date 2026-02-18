@@ -45,9 +45,12 @@ class LLMPatchSubagent:
             if s:
                 snippets.append(f"FILE: {rp}\n---\n{s}\n")
 
+        strategy = meta.get("strategy")
+        strategy_block = f"\nSTRATEGY (follow this approach):\n{strategy}\n" if strategy else ""
+
         prompt = f"""
 You are editing a git repository. Produce a SINGLE unified diff that implements the goal.
-
+{strategy_block}
 GOAL:
 {goal}
 

@@ -23,18 +23,12 @@ dependencies = [
     { name = "httpx" },
     { name = "pdf2img" },
     { name = "pydantic" },
+    { name = "pydantic-ai" },
+    { name = "python-docx" },
     { name = "python-dotenv" },
     { name = "python-pptx" },
-    { name = "rich" },
-]
-
-[package.optional-dependencies]
-agent = [
-    { name = "pydantic-ai" },
-]
-docs = [
-    { name = "python-docx" },
     { name = "reportlab" },
+    { name = "rich" },
 ]
 
 [package.metadata]
@@ -43,15 +37,14 @@ requires-dist = [
     { name = "httpx", specifier = ">=0.28.1" },
     { name = "pdf2img", specifier = ">=0.1.2" },
     { name = "pydantic", specifier = ">=2.12.5" },
-    { name = "pydantic-ai", marker = "extra == 'agent'", specifier = ">=1.60.0" },
-    { name = "python-docx", marker = "extra == 'docs'", specifier = ">=1.2.0" },
+    { name = "pydantic-ai", specifier = ">=1.60.0" },
+    { name = "python-docx", specifier = ">=1.2.0" },
     { name = "python-dotenv", specifier = ">=1.0.0" },
     { name = "python-dotenv", specifier = ">=1.2.1" },
     { name = "python-pptx", specifier = ">=1.0.2" },
-    { name = "reportlab", marker = "extra == 'docs'", specifier = ">=4.4.10" },
+    { name = "reportlab", specifier = ">=4.4.10" },
     { name = "rich", specifier = ">=14.3.2" },
 ]
-provides-extras = ["agent", "docs"]
 
 [[package]]
 name = "aiohappyeyeballs"

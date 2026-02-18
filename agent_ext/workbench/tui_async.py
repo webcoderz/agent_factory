@@ -6,20 +6,53 @@ from typing import Optional
 from rich.console import Console
 from rich.panel import Panel
 from rich.table import Table
+from rich.theme import Theme
 
 from .loop import plan_and_queue, run_next_task
 
-console = Console()
+# Slightly custom theme: keep default but ensure status colors pop
+console = Console(theme=Theme({"info": "cyan", "success": "green", "warn": "yellow", "error": "red", "dim": "dim"}))
+
+BANNER = """
+[bold cyan]  ╭─────────────────────────────────────╮
+  │  [bold white]agent_patterns[/bold white] [dim]workbench[/dim]        │
+  ╰─────────────────────────────────────╯[/bold cyan]
+[dim]  plan → search → design → implement → gates[/dim]
+"""
+
+# Which subagents run for each task kind (for display)
+TASK_SUBAGENTS = {
+    "analyze": "LLM (clarify goal)",
+    "search": "repo_grep, bm25",
+    "design": "LLM (approach + file list)",
+    "implement": "llm_patch (worktree)",
+    "gates": "import_check, compile_check",
+}
+
+
+def _status_style(status: str) -> str:
+    if status == "done":
+        return "green"
+    if status == "in_progress":
+        return "yellow"
+    if status == "failed":
+        return "red"
+    return "dim"
 
 
 def _tasks_table(ctx) -> Table:
-    t = Table(title="Task Queue")
-    t.add_column("id", style="bold")
-    t.add_column("kind")
-    t.add_column("status")
-    t.add_column("title")
+    t = Table(title="[bold]Task Queue[/bold]", title_style="bold white", border_style="dim")
+    t.add_column("id", style="bold cyan")
+    t.add_column("kind", style="magenta")
+    t.add_column("status", style=None)
+    t.add_column("title", style="white")
     for task in ctx.task_queue.list():
-        t.add_row(task.id, task.kind, task.status, task.title)
+        t.add_row(
+            task.id,
+            task.kind,
+            f"[{_status_style(task.status)}]{task.status}[/]",
+            task.title,
+        )
     return t
 
 
@@ -31,7 +64,12 @@ async def _ainput(prompt: str) -> str:
 async def run_tui(ctx) -> None:
     # Start MCP server now that the event loop is running (cannot start in build_ctx)
     ctx.mcp_server.start()
-    console.print(Panel.fit("agent_patterns workbench (async)\n/help for commands, /quit to exit"))
+    console.print(BANNER)
+    console.print(Panel.fit(
+        "[bold]/help[/] commands  [bold]/plan <goal>[/]  [bold]/run[/]  [bold]/quit[/]",
+        border_style="cyan",
+        padding=(0, 1),
+    ))
 
     while True:
         msg = (await _ainput("[bold cyan]you> [/bold cyan]")).strip()
@@ -45,31 +83,39 @@ async def run_tui(ctx) -> None:
         if msg == "/help":
             console.print(Panel(
                 "\n".join([
-                    "/help",
-                    "/status",
-                    "/agents",
-                    "/tasks",
-                    "/plan <goal>",
-                    "/run",
-                    "/run N",
-                    "/parallel <n>",
-                    "/model",
-                    "/workflows",
-                    "/assemble <task_type> <text>",
-                    "/exec <task_type> <text>",
-                    "/quit",
-                    "/adopt <diff>",
+                    "[cyan]/help[/]     this",
+                    "[cyan]/status[/]   case/session",
+                    "[cyan]/agents[/]   list subagents",
+                    "[cyan]/tasks[/]    task queue",
+                    "[cyan]/plan <goal>[/]  queue plan",
+                    "[cyan]/run[/] [dim]or[/] [cyan]/run N[/]  run next task(s)",
+                    "[cyan]/parallel <n>[/]  max subagents",
+                    "[cyan]/model[/]   model info",
+                    "[cyan]/workflows[/]  list",
+                    "[cyan]/assemble[/] [cyan]/exec[/]  workflow",
+                    "[cyan]/adopt[/]   apply last patch",
+                    "[cyan]/quit[/]    exit",
                 ]),
-                title="commands"
+                title="[bold]commands[/bold]",
+                border_style="cyan",
             ))
             continue
 
         if msg == "/status":
-            console.print(Panel(f"case={ctx.case_id} session={ctx.session_id} user={ctx.user_id}"))
+            console.print(Panel(
+                f"[bold]case[/]={ctx.case_id}  [bold]session[/]={ctx.session_id}  [bold]user[/]={ctx.user_id}",
+                title="[bold]status[/bold]",
+                border_style="dim",
+            ))
             continue
 
         if msg == "/agents":
-            console.print(Panel("\n".join(ctx.subagents.list()), title="subagents"))
+            agents = ctx.subagents.list()
+            console.print(Panel(
+                "\n".join(f"  [cyan]•[/] {a}" for a in agents),
+                title="[bold]subagents[/bold]",
+                border_style="cyan",
+            ))
             continue
 
         if msg == "/adopt":
@@ -85,6 +131,7 @@ async def run_tui(ctx) -> None:
             continue
         if msg == "/tasks":
             console.print(_tasks_table(ctx))
+            console.print("[dim]  ───[/dim]")
             continue
 
         if msg.startswith("/parallel "):
@@ -97,13 +144,15 @@ async def run_tui(ctx) -> None:
             continue
 
         if msg == "/model":
-            console.print(Panel(f"model={'set' if ctx.model else 'none'}; model_calls_parallel={ctx.model_limiter._sem._value if hasattr(ctx.model_limiter, '_sem') else 'n/a'}"))
+            model_status = "[green]set[/]" if ctx.model else "[red]none[/]"
+            limiter = ctx.model_limiter._sem._value if hasattr(ctx.model_limiter, "_sem") else "n/a"
+            console.print(Panel(f"model={model_status}  [dim]parallel slots=[/]{limiter}", title="[bold]model[/bold]", border_style="dim"))
             continue
 
         if msg.startswith("/plan "):
             goal = msg.split(" ", 1)[1].strip()
             lines = await plan_and_queue(ctx, goal)
-            console.print(Panel("\n".join(lines), title="plan"))
+            console.print(Panel("\n".join(lines), title="[bold]plan[/bold]", border_style="green"))
             continue
 
         if msg.startswith("/run"):
@@ -116,15 +165,30 @@ async def run_tui(ctx) -> None:
                     count = 1
 
             outs = []
-            for _ in range(max(1, count)):
-                outs.append(await run_next_task(ctx))
+            for i in range(max(1, count)):
+                # Show which task and subagents are about to run
+                next_t = ctx.task_queue.next_pending()
+                if next_t:
+                    subagents_desc = TASK_SUBAGENTS.get(next_t.kind, "—")
+                    console.print(
+                        f"  [dim]⟳[/] [yellow]Running[/] [bold]{next_t.id}[/] [cyan]({next_t.kind})[/] "
+                        f"[dim]→ {subagents_desc}[/]"
+                    )
+                out = await run_next_task(ctx)
+                outs.append(out)
+                if next_t and out.startswith(f"{next_t.id} done"):
+                    console.print(f"  [green]✓[/] [dim]{next_t.id} done[/]")
+                elif next_t and out.startswith(f"{next_t.id} failed"):
+                    console.print(f"  [red]✗[/] [dim]{next_t.id} failed[/]")
 
-            console.print(Panel("\n\n".join(outs), title="run"))
+            console.print()
+            console.print(Panel("\n\n".join(outs), title="[bold]run[/bold]", border_style="yellow"))
             continue
 
         if msg == "/workflows":
             names = ctx.workflow_registry.list_workflows()
-            console.print(Panel("\n".join(names) if names else "none", title="workflows"))
+            body = "\n".join(f"  [cyan]•[/] {n}" for n in names) if names else "[dim]none[/]"
+            console.print(Panel(body, title="[bold]workflows[/bold]", border_style="dim"))
             continue
 
         if msg.startswith("/assemble "):

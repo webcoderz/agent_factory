@@ -4,7 +4,7 @@ import asyncio
 import json
 from pathlib import Path
 from typing import Any, Dict, List, Optional
-
+import os
 from .subagents import SubagentResult
 
 # Optional: pydantic-ai for design/implement LLM steps
@@ -17,16 +17,21 @@ from agent_ext.workbench.worktrees import create_worktree, cleanup_worktree, wor
 from agent_ext.self_improve.gates import run_gates
 from agent_ext.self_improve.models import GatePlan
 from agent_ext.self_improve.patching import apply_unified_diff
+from agent_ext.workbench.adopt import apply_diff_to_repo, commit_and_push
+from agent_ext.cog.scoring import score_patch, touched_files_from_diff
 from pathlib import Path
 
-async def _implement_in_worktree(ctx, goal: str, candidates: list[dict]) -> str:
+async def _implement_in_worktree(ctx, goal: str, candidates: list[dict], strategy: str | None = None) -> str:
     run_id = ctx.session_id  # or a uuid
     wt = create_worktree(run_id=run_id, agent_name="writer_llm_patch")
 
     try:
         # 1) generate diff (inside the worktree context)
         patcher = ctx.subagents.get("llm_patch")
-        res = await patcher.run(ctx, input=goal, meta={"workdir": str(wt.path), "candidates": candidates, "max_files": 6})
+        meta = {"workdir": str(wt.path), "candidates": candidates, "max_files": 6}
+        if strategy:
+            meta["strategy"] = strategy
+        res = await patcher.run(ctx, input=goal, meta=meta)
         if not res.ok:
             return f"implement: patch generation failed: {res.meta}"
 
@@ -68,14 +73,49 @@ async def _implement_in_worktree(ctx, goal: str, candidates: list[dict]) -> str:
 
         hist.write_text(json.dumps(data, indent=2), encoding="utf-8")
         # --------------------------------------------
+        touched = touched_files_from_diff(diff)
+        sc = score_patch(gates_ok=gates.ok, diff_chars=len(diff), files_touched=len(touched), eval_delta=0.0)
+        # ---- AUTO-ADOPT (optional) ----
+        AUTO_ADOPT = bool(int(os.getenv("AUTO_ADOPT", "0")))  # default off until you're confident
+        AUTO_PUSH_BRANCH = os.getenv("AUTO_PUSH_BRANCH", "dev")
+        threshold = float(os.getenv("AUTO_COMMIT_THRESHOLD", "80"))
 
-        return (
-            f"implement: ok_apply={ok_apply} gates_ok={gates.ok}\n"
-            f"diff_chars={len(diff)}\n"
-            f"diff_saved={diff_path}\n"
-            f"gates={list(gates.details.keys())}\n"
-            f"(next step: /adopt to apply to main)\n"
-        )
+        if gates.ok and AUTO_ADOPT and sc.score >= threshold:
+            # 1) apply to main working tree (outside worktree)
+            apply_diff_to_repo(diff, repo_root=Path("."))
+
+            # 2) rerun gates on main tree (highly recommended)
+            main_plan = GatePlan(import_check=True, compile_check=True, pytest_paths=[])
+            main_gates = run_gates(main_plan)
+
+            if not main_gates.ok:
+                return (
+                    "implement: worktree gates passed, BUT main-tree gates FAILED after auto-adopt.\n"
+                    f"diff_saved={diff_path}\n"
+                    f"main_gates={list(main_gates.details.keys())}\n"
+                    "Patch is applied in your working tree; revert or fix-forward.\n"
+                )
+
+            # 3) commit + push
+            msg = f"auto: {goal[:72]}"
+            commit_and_push(message=msg, branch=AUTO_PUSH_BRANCH, repo_root=Path("."))
+
+            return (
+                f"implement: ok_apply={ok_apply} gates_ok={gates.ok}\n"
+                f"auto_adopted_and_pushed={AUTO_PUSH_BRANCH}\n"
+                f"diff_saved={diff_path}\n"
+            )
+        # ------------------------------
+        else:
+
+            return (
+                f"implement: ok_apply={ok_apply} gates_ok={gates.ok}\n"
+                f"diff_saved={diff_path}\n"
+                f"score={sc.score}\n"
+                f"threshold={threshold}\n"
+                f"AUTO_ADOPT={AUTO_ADOPT}\n"
+                f"AUTO_PUSH_BRANCH={AUTO_PUSH_BRANCH}\n"
+            )
 
     finally:
         cleanup_worktree(wt, prune_branch=False)
@@ -201,14 +241,15 @@ async def run_next_task(ctx) -> str:
             return f"{t.id} done: design (no model)"
 
         if t.kind == "implement":
-            # find the original goal; simplest: use t.input as goal
             candidates = []
-            # pull from previous tasks if you want; quick hack:
             for prev in ctx.task_queue.list():
                 if prev.kind == "search" and prev.meta.get("bm25_candidates"):
                     candidates = prev.meta["bm25_candidates"]
                     break
-            out = await _implement_in_worktree(ctx, str(t.input), candidates)
+            state = getattr(ctx, "workbench_run_state", None) or {}
+            design = state.get("design") or {}
+            strategy = (design.get("approach") or "").strip() if isinstance(design, dict) else None
+            out = await _implement_in_worktree(ctx, str(t.input), candidates, strategy=strategy)
             t.status = "done"
             return f"{t.id} done: implement\n{out}"
 
