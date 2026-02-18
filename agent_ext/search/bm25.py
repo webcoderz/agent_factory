@@ -32,6 +32,14 @@ class BM25Index:
         self.doc_sha: Dict[str, str] = {}
         self.N: int = 0
         self.avgdl: float = 0.0
+        self._index_ready: bool = False  # rebuild deferred until first search
+
+    def ensure_index(self) -> None:
+        """Build or refresh index on first use (keeps startup fast)."""
+        if self._index_ready:
+            return
+        self.rebuild_incremental()
+        self._index_ready = True
 
     def load(self) -> None:
         meta = read_json(BM25_META_FILE, {})
@@ -126,6 +134,7 @@ class BM25Index:
         return len(changed), len(removed)
 
     def search(self, query: str, *, top_k: int | None = None) -> List[Tuple[str, float]]:
+        self.ensure_index()
         q_toks = self.tokenizer.tokenize(query)
         if not q_toks or self.N == 0:
             return []

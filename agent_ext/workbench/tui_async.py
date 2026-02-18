@@ -29,6 +29,8 @@ async def _ainput(prompt: str) -> str:
 
 
 async def run_tui(ctx) -> None:
+    # Start MCP server now that the event loop is running (cannot start in build_ctx)
+    ctx.mcp_server.start()
     console.print(Panel.fit("agent_patterns workbench (async)\n/help for commands, /quit to exit"))
 
     while True:

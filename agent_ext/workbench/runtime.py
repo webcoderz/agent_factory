@@ -92,14 +92,13 @@ def build_ctx(
         tok_cfg=TokenizerConfig(use_tiktoken=use_tiktoken, tiktoken_encoding=tok_enc),
         indexer_cfg=RepoIndexerConfig(),
     )
-    # load/rebuild once at startup
-    ctx.search.rebuild_incremental()
+    # Index built on first search (keeps startup fast)
 
     ctx.mcp_registry = MCPToolRegistry()
     ctx.mcp_transport = LocalTransport(server_in=asyncio.Queue(), server_out=asyncio.Queue())
     ctx.mcp_server = MCPServer(ctx.mcp_registry, ctx.mcp_transport)
     ctx.mcp_client = MCPClient(ctx.mcp_transport)
-    ctx.mcp_server.start()
+    # MCP server started in run_tui() when event loop is running
 
     # example MCP tool: bm25_search
     ctx.mcp_registry.register(
