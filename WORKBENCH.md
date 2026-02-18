@@ -20,3 +20,13 @@ In the TUI
 - adjust parallel: /parallel 8
 
 This will already feel like: goal → plan → concurrent repo scans → iterative execution.
+
+---
+
+**Fully automated (no TUI)**  
+See `docs/AUTO_AGENT.md` for design. Run the daemon:
+
+  export USE_OPENAI_CHAT_MODEL=1
+  python -m agent_ext.cog [--use-openai-chat-model]
+
+Set `AUTO_ADOPT=1` and `AUTO_PUSH_BRANCH` (e.g. `dev` or `auto/$(hostname)`) to auto-commit and push after gates. Adopt pulls before push and retries on conflict (see `.env.example`).

@@ -7,7 +7,7 @@ from .state import Budget, CogState, RegressionMemory
 from .triggers import detect_triggers, repo_fingerprint
 from .modes import choose_mode
 from .strategy_bank import pick_strategies
-from .scorer import score_candidate
+from .scoring import score_patch
 
 # You already have these pieces:
 # - create_worktree / cleanup_worktree
@@ -32,8 +32,13 @@ def _diff_touched_files(diff_text: str) -> List[str]:
     return sorted(set(files))
 
 async def run_cognitive_cycle(ctx, goal: str, budget: Budget) -> Dict[str, Any]:
-    state: CogState = ctx.cog_state
-    reg: RegressionMemory = ctx.regression_memory
+    state: CogState = getattr(ctx, "cog_state", None)
+    reg: RegressionMemory = getattr(ctx, "regression_memory", None)
+    if state is None or reg is None:
+        raise RuntimeError(
+            "RunContext must have cog_state and regression_memory. "
+            "Use agent_ext.workbench.runtime.build_ctx() to build ctx for the daemon."
+        )
 
     triggers = detect_triggers(state.last_repo_fingerprint)
 
@@ -105,7 +110,7 @@ async def run_cognitive_cycle(ctx, goal: str, budget: Budget) -> Dict[str, Any]:
     for r in results:
         if not r.get("ok") or "diff" not in r:
             continue
-        sc = score_candidate(
+        sc = score_patch(
             gates_ok=bool(r.get("gates_ok")),
             diff_chars=int(r.get("diff_chars", 0)),
             files_touched=len(r.get("files", [])),

@@ -1,11 +1,16 @@
 from __future__ import annotations
 
 import asyncio
-from typing import Optional
+import time
+from typing import List, Optional
 
-from rich.console import Console
+from rich.console import Console, Group
+from rich.live import Live
 from rich.panel import Panel
+from rich.rule import Rule
+from rich.spinner import Spinner
 from rich.table import Table
+from rich.text import Text
 from rich.theme import Theme
 
 from .loop import plan_and_queue, run_next_task
@@ -19,6 +24,34 @@ BANNER = """
   ╰─────────────────────────────────────╯[/bold cyan]
 [dim]  plan → search → design → implement → gates[/dim]
 """
+# Animated-looking rule (static; use Live elsewhere for motion)
+BANNER_RULE_STYLE = "cyan dim"
+
+# Spinner names: dots, dots12, line, aesthetic, runner, arc, etc. Run: python -m rich.spinner
+RUN_SPINNER = "dots12"
+LIVE_REFRESH_PER_SECOND = 10
+
+
+class _LiveSpinner:
+    """Renderable that shows an animated spinner; message_ref is a list so the caller can update the text. Implements __rich_console__ for Rich."""
+
+    def __init__(
+        self,
+        message_ref: List[str],
+        spinner_name: str = "dots12",
+        style: str = "bold cyan",
+        use_markup: bool = True,
+    ):
+        self._message_ref = message_ref
+        self._spinner = Spinner(spinner_name, style=style)
+        self._use_markup = use_markup
+
+    def __rich_console__(self, console: Console, options):
+        t = time.time()
+        msg = self._message_ref[0] if self._message_ref else "Running..."
+        text = Text.from_markup(" " + msg) if self._use_markup else Text(" " + msg)
+        yield Group(self._spinner.render(t), text)
+
 
 # Which subagents run for each task kind (for display)
 TASK_SUBAGENTS = {
@@ -65,6 +98,7 @@ async def run_tui(ctx) -> None:
     # Start MCP server now that the event loop is running (cannot start in build_ctx)
     ctx.mcp_server.start()
     console.print(BANNER)
+    console.print(Rule(style=BANNER_RULE_STYLE))
     console.print(Panel.fit(
         "[bold]/help[/] commands  [bold]/plan <goal>[/]  [bold]/run[/]  [bold]/quit[/]",
         border_style="cyan",
@@ -151,7 +185,15 @@ async def run_tui(ctx) -> None:
 
         if msg.startswith("/plan "):
             goal = msg.split(" ", 1)[1].strip()
-            lines = await plan_and_queue(ctx, goal)
+            plan_message: List[str] = [f"[dim]Planning: {goal[:50]}{'…' if len(goal) > 50 else ''}[/]"]
+            plan_spinner = Panel(
+                _LiveSpinner(plan_message, spinner_name="dots", style="bold green"),
+                title="[bold green] plan [/]",
+                border_style="green",
+                padding=(0, 1),
+            )
+            with Live(plan_spinner, refresh_per_second=LIVE_REFRESH_PER_SECOND, console=console):
+                lines = await plan_and_queue(ctx, goal)
             console.print(Panel("\n".join(lines), title="[bold]plan[/bold]", border_style="green"))
             continue
 
@@ -164,23 +206,37 @@ async def run_tui(ctx) -> None:
                 except Exception:
                     count = 1
 
-            outs = []
-            for i in range(max(1, count)):
-                # Show which task and subagents are about to run
-                next_t = ctx.task_queue.next_pending()
-                if next_t:
-                    subagents_desc = TASK_SUBAGENTS.get(next_t.kind, "—")
-                    console.print(
-                        f"  [dim]⟳[/] [yellow]Running[/] [bold]{next_t.id}[/] [cyan]({next_t.kind})[/] "
-                        f"[dim]→ {subagents_desc}[/]"
-                    )
-                out = await run_next_task(ctx)
-                outs.append(out)
-                if next_t and out.startswith(f"{next_t.id} done"):
-                    console.print(f"  [green]✓[/] [dim]{next_t.id} done[/]")
-                elif next_t and out.startswith(f"{next_t.id} failed"):
-                    console.print(f"  [red]✗[/] [dim]{next_t.id} failed[/]")
+            outs: List[str] = []
+            run_message: List[str] = ["Starting…"]
+            live_renderable = Panel(
+                _LiveSpinner(run_message, spinner_name=RUN_SPINNER),
+                title="[bold yellow] run [/]",
+                border_style="yellow",
+                padding=(0, 1),
+            )
 
+            with Live(live_renderable, refresh_per_second=LIVE_REFRESH_PER_SECOND, console=console):
+                for i in range(max(1, count)):
+                    next_t = ctx.task_queue.next_pending()
+                    if next_t:
+                        subagents_desc = TASK_SUBAGENTS.get(next_t.kind, "—")
+                        run_message[0] = f"[bold]{next_t.id}[/] [cyan]({next_t.kind})[/] [dim]→ {subagents_desc}[/]"
+                    else:
+                        run_message[0] = "[dim]No pending tasks[/]"
+                    out = await run_next_task(ctx)
+                    outs.append(out)
+                    if next_t and out.startswith(f"{next_t.id} done"):
+                        run_message[0] = f"[green]✓ {next_t.id} done[/] — next…"
+                    elif next_t and out.startswith(f"{next_t.id} failed"):
+                        run_message[0] = f"[red]✗ {next_t.id} failed[/] — next…"
+
+            # After Live stops, show completion and result panel
+            if outs:
+                for o in outs:
+                    if "done:" in o:
+                        console.print(f"  [green]✓[/] [dim]{o.split(chr(10))[0]}[/]")
+                    elif "failed" in o:
+                        console.print(f"  [red]✗[/] [dim]{o.split(chr(10))[0]}[/]")
             console.print()
             console.print(Panel("\n\n".join(outs), title="[bold]run[/bold]", border_style="yellow"))
             continue
@@ -238,5 +294,13 @@ async def run_tui(ctx) -> None:
 
 
         # Plain chat message = treat as goal (fast UX)
-        lines = await plan_and_queue(ctx, msg)
+        plan_message_plain: List[str] = [msg[:60] + ("…" if len(msg) > 60 else "")]
+        plan_spinner_plain = Panel(
+            _LiveSpinner(plan_message_plain, spinner_name="arc", style="bold cyan", use_markup=False),
+            title="[bold cyan] plan [/]",
+            border_style="cyan",
+            padding=(0, 1),
+        )
+        with Live(plan_spinner_plain, refresh_per_second=LIVE_REFRESH_PER_SECOND, console=console):
+            lines = await plan_and_queue(ctx, msg)
         console.print(Panel("\n".join(lines), title="plan"))

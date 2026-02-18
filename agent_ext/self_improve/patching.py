@@ -65,7 +65,9 @@ def apply_unified_diff(diff_text: str, repo_root: Path = Path(".")) -> tuple[boo
     """
     cleaned = sanitize_diff_for_apply(diff_text)
     if not cleaned.strip():
-        return False, "sanitize_diff: no unified diff found in output"
+        return False, "sanitize_diff: no unified diff found in output (LLM must output raw diff: ---/+++ headers, @@ hunks, no markdown)"
+    if "@@" not in cleaned:
+        return False, "sanitize_diff: no valid hunks (unified diff must contain @@ hunk headers; LLM may have returned prose instead of a diff)"
     p = subprocess.run(
         ["git", "apply", "--whitespace=nowarn", "-"],
         input=cleaned,
@@ -74,4 +76,7 @@ def apply_unified_diff(diff_text: str, repo_root: Path = Path(".")) -> tuple[boo
         capture_output=True,
     )
     ok = p.returncode == 0
-    return ok, (p.stdout + "\n" + p.stderr).strip()
+    err = (p.stdout + "\n" + p.stderr).strip()
+    if not ok and "No valid patches" in err:
+        err = "LLM did not produce a valid unified diff (git apply: no valid patches). Output must be raw diff only: diff --git or ---/+++, then @@ hunks with +/− lines. No markdown or commentary."
+    return ok, err

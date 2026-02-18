@@ -58,6 +58,9 @@ class RunContext:
     memory: Any = None
     rlm: Any = None
     todo: Any = None  # TodoToolset for task CRUD
+    # cog daemon / self-improve (workbench build_ctx sets these)
+    cog_state: Any = None
+    regression_memory: Any = None
 
 
 @dataclass(frozen=True)

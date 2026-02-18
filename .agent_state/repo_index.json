@@ -16,9 +16,9 @@
       "skipped": false
     },
     "pyproject.toml": {
-      "sha256": "41b9ce0a760f80b9f7290bec18575e762fd8b5893a50ffa921238e6e5104cc2f",
-      "size": 809,
-      "mtime": 1771447160.549888,
+      "sha256": "9bcd3c6b66506fb038c5a3d429e8173ebe1c69cc325223bd5d192cd020196c3e",
+      "size": 430,
+      "mtime": 1771450418.830992,
       "lang": "toml",
       "skipped": false
     },
@@ -632,9 +632,9 @@
       "skipped": false
     },
     "agent_ext/self_improve/patching.py": {
-      "sha256": "8e026f57f0c571409c8b0e248fff7d757119413e9e3e4d9ebce32632e95f7f0f",
-      "size": 579,
-      "mtime": 1771443637.209996,
+      "sha256": "b39dc39353fb52ac59277d94807dd759b080f2707d98bb9d028e238214406d79",
+      "size": 2938,
+      "mtime": 1771450589.8782816,
       "lang": "python",
       "skipped": false
     },
@@ -807,9 +807,9 @@
       "skipped": false
     },
     "agent_ext/workbench/loop.py": {
-      "sha256": "82a842002ef9950b595cebd250c991b5bc6931e09841df4c69ac85d71315c6d0",
-      "size": 9819,
-      "mtime": 1771449539.8325033,
+      "sha256": "af17fa5a0e15a548b993247ba7250cd475d35bab5654ded3430921797f693a67",
+      "size": 11907,
+      "mtime": 1771457013.0505555,
       "lang": "python",
       "skipped": false
     },
@@ -856,9 +856,9 @@
       "skipped": false
     },
     "agent_ext/workbench/tui_async.py": {
-      "sha256": "15dcb52b575676cee97f1c568dc32df311bbc112fce4d9f8fbe7a124c2c8980f",
-      "size": 6591,
-      "mtime": 1771448934.6056058,
+      "sha256": "508b17a53b5507816d5d64f3655ae70bb1eacf53a5ad67c8cdfe14417cfc7ead",
+      "size": 9767,
+      "mtime": 1771456405.282829,
       "lang": "python",
       "skipped": false
     },
@@ -996,9 +996,72 @@
       "skipped": false
     },
     "agent_ext/workbench/subagents_patch.py": {
-      "sha256": "7598e668c09648f74640da54c33ef16ab72bef13857bfebcdeb011845c480441",
-      "size": 2489,
-      "mtime": 1771450019.542259,
+      "sha256": "ff5d8c3b3d89b054b933f2cc5626f143f398453c0bf15e956d6c89460a034c55",
+      "size": 2900,
+      "mtime": 1771456061.9232829,
+      "lang": "python",
+      "skipped": false
+    },
+    "agent_ext/cog/daemon.py": {
+      "sha256": "b332271c072b2c7e902e6e54c74d2b470f752c887ad3e0cbb368bdb231761079",
+      "size": 1726,
+      "mtime": 1771456545.3275213,
+      "lang": "python",
+      "skipped": false
+    },
+    "agent_ext/cog/loop_v2.py": {
+      "sha256": "ac10bea4537f50a75ac162fbe6152b6ae9d5c0d452192254b617d87590e3ebcb",
+      "size": 6917,
+      "mtime": 1771455793.8587077,
+      "lang": "python",
+      "skipped": false
+    },
+    "agent_ext/cog/modes.py": {
+      "sha256": "34d0a627047f0d33b56f72233d3af1c67aabe8214336e64bdd521740357e40bc",
+      "size": 917,
+      "mtime": 1771455767.8363042,
+      "lang": "python",
+      "skipped": false
+    },
+    "agent_ext/cog/scoring.py": {
+      "sha256": "3540d9fe9f10339201c94fc41849df3c1b375c972030ef0fce79e280e146db79",
+      "size": 1274,
+      "mtime": 1771456587.2548218,
+      "lang": "python",
+      "skipped": false
+    },
+    "agent_ext/cog/state.py": {
+      "sha256": "241866be6072d431b7e3dea31d96371144c4c982b6561b2fe07338e282800267",
+      "size": 2835,
+      "mtime": 1771455743.2610798,
+      "lang": "python",
+      "skipped": false
+    },
+    "agent_ext/cog/strategy_bank.py": {
+      "sha256": "03b2ae1aad71936898ff4d38002ea30155762af5ae31f4727ba92926f7261dd4",
+      "size": 556,
+      "mtime": 1771455778.3214843,
+      "lang": "python",
+      "skipped": false
+    },
+    "agent_ext/cog/triggers.py": {
+      "sha256": "88814ba251ecc52280158ce3aa9f6b645b9395fd9a0ae86d65fdd8bc5c7ed0bb",
+      "size": 1070,
+      "mtime": 1771455758.7731032,
+      "lang": "python",
+      "skipped": false
+    },
+    "agent_ext/cog/__init__.py": {
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "size": 0,
+      "mtime": 1771455634.656199,
+      "lang": "python",
+      "skipped": false
+    },
+    "agent_ext/workbench/adopt.py": {
+      "sha256": "8b7139f4d42da17804dd7676f4f52394212f40b84254883f1e279d6271f01947",
+      "size": 1943,
+      "mtime": 1771456606.287428,
       "lang": "python",
       "skipped": false
     }

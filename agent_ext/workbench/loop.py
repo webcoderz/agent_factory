@@ -42,7 +42,7 @@ async def _implement_in_worktree(ctx, goal: str, candidates: list[dict], strateg
 
         # 3) gates in worktree (compile/import; pytest optional)
         plan = GatePlan(import_check=True, compile_check=True, pytest_paths=[])
-        gates = run_gates(plan)
+        gates = run_gates(plan, repo_root=wt.path)
 
         # 4) produce final diff
         diff = worktree_diff(wt)
@@ -86,7 +86,7 @@ async def _implement_in_worktree(ctx, goal: str, candidates: list[dict], strateg
 
             # 2) rerun gates on main tree (highly recommended)
             main_plan = GatePlan(import_check=True, compile_check=True, pytest_paths=[])
-            main_gates = run_gates(main_plan)
+            main_gates = run_gates(main_plan, repo_root=Path("."))
 
             if not main_gates.ok:
                 return (
