@@ -12,6 +12,7 @@ def _ensure_root_importable() -> None:
 
 _ensure_root_importable()
 
+
 from .run_context import RunContext, ToolCall, ToolResult
 from .hooks.base import Hook, BlockedToolCall, BlockedPrompt
 from .hooks.builtins import AuditHook, PolicyHook, ContentFilterHook, ContentFilterFn, make_blocklist_filter
@@ -38,6 +39,13 @@ from .ingest.pipeline import IngestPipeline
 from .ingest.retry_planner import OCRRetryAction
 from .ingest.multi_extractor import MultiExtractor
 from .todo.models import Task, TaskCreate, TaskPatch, TaskQuery, TaskStatus
+from .export.models import ExportResult, ExportRequest
+from .export.base import Exporter
+from .export.html_writer import HtmlExporter
+from .export.docx_writer import DocxExporter
+from .export.pdf_writer import PdfExporter
+from .export.pptx_writer import PptxExporter
+
 
 # Optional: pydantic-ai (agent + vision OCR). Omit from core deps to avoid version/Starlette conflicts.
 # If your app already has pydantic-ai, these will use it; else install with: pip install agent-patterns[agent]
@@ -54,6 +62,7 @@ from .todo.store_memory import InMemoryTaskStore
 from .todo.store_postgres import PostgresTaskStore
 from .todo.events import TaskEvent, TaskEventBus, InProcessEventBus, WebhookEventBus
 from .todo.toolset import TodoToolset
+
 
 __all__ = [
     "RunContext", "ToolCall", "ToolResult",
@@ -76,6 +85,8 @@ __all__ = [
     "TaskStore", "InMemoryTaskStore", "PostgresTaskStore",
     "TaskEvent", "TaskEventBus", "InProcessEventBus", "WebhookEventBus",
     "TodoToolset",
+    "ExportResult", "ExportRequest",
+    "Exporter", "HtmlExporter", "DocxExporter", "PdfExporter", "PptxExporter",
 ]
 if LLMVisionOCREngine is not None:
     __all__.append("LLMVisionOCREngine")
