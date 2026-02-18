@@ -13,17 +13,7 @@ dependencies = [
     "python-dotenv>=1.2.1",
     "python-pptx>=1.0.2",
     "rich>=14.3.2",
-]
-[project.optional-dependencies]
-# Install with: pip install agent-patterns[agent] or uv add "agent-patterns[agent]"
-# Use this extra when you want PydanticAIAgentBase and LLMVisionOCREngine.
-# If your app already has pydantic-ai (any version), you can omit [agent] and
-# the package will use your installed pydantic-ai when you use the agent/vision OCR.
-agent = [
-    "pydantic-ai>=1.60.0",
-]
-
-docs = [
     "python-docx>=1.2.0",
     "reportlab>=4.4.10",
+    "pydantic-ai>=1.60.0",
 ]
