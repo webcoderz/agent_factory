@@ -52,11 +52,11 @@ GOAL:
 {goal}
 
 RULES:
-- Output ONLY a unified diff (git-style). No commentary.
-- Keep changes minimal.
-- If adding files, include them in diff.
-- Prefer modifying existing code rather than inventing new frameworks.
-- Ensure code compiles.
+- Output ONLY the raw unified diff. No markdown, no code fences (no ```), no explanation before or after.
+- Start with "diff --git a/path b/path" or "--- path" and end with the last hunk line.
+- Keep changes minimal. Use standard unified diff format: ---/+++ headers, @@ hunk headers, then context lines (space), +add, -remove.
+- For new files use --- /dev/null and +++ b/path.
+- Prefer modifying existing code rather than inventing new frameworks. Ensure code compiles.
 
 CONTEXT SNIPPETS:
 {chr(10).join(snippets) if snippets else "(no snippets)"}
