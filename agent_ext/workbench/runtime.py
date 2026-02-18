@@ -17,6 +17,11 @@ from agent_ext.workflow.experience import ExperienceStore
 from agent_ext.workflow.planner import WorkflowPlanner
 from agent_ext.workflow.executor import WorkflowExecutor
 from agent_ext.search import BM25Index, BM25Config, TokenizerConfig, RepoIndexerConfig
+from agent_ext.workbench.subagents_bm25 import BM25SearchSubagent
+try:
+    from agent_ext.self_improve.controller import SelfImproveController
+except Exception:
+    SelfImproveController = None  # type: ignore[misc, assignment]
 
 use_tiktoken = bool(int(os.getenv("USE_TIKTOKEN", "0")))
 tok_enc = os.getenv("TIKTOKEN_ENCODING", "o200k_base")
@@ -73,12 +78,16 @@ def build_ctx(
     reg = SubagentRegistry()
     reg.register(PlannerSubagent())
     reg.register(RepoGrepSubagent())
-
+    reg.register(BM25SearchSubagent())
     ctx.subagents = reg
     ctx.orchestrator = SubagentOrchestrator(reg)
 
     # Commands map (TUI)
     ctx.commands = {}
+    # Run state for plan → design → implement (search results, design output, etc.)
+    ctx.workbench_run_state = {}
+    # Self-improve: apply patches and run gates (optional)
+    ctx.self_improve = SelfImproveController() if SelfImproveController else None
     # Workflow synthesis + learning
     ctx.workflow_registry = WorkflowRegistry()
     register_workflow_builtins(ctx.workflow_registry)

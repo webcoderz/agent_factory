@@ -1,10 +1,84 @@
 from __future__ import annotations
 
 import asyncio
+import json
+from pathlib import Path
 from typing import Any, Dict, List, Optional
 
 from .subagents import SubagentResult
 
+# Optional: pydantic-ai for design/implement LLM steps
+try:
+    from pydantic_ai import Agent
+except ImportError:
+    Agent = None  # type: ignore[misc, assignment]
+
+from agent_ext.workbench.worktrees import create_worktree, cleanup_worktree, worktree_diff
+from agent_ext.self_improve.gates import run_gates
+from agent_ext.self_improve.models import GatePlan
+from agent_ext.self_improve.patching import apply_unified_diff
+from pathlib import Path
+
+async def _implement_in_worktree(ctx, goal: str, candidates: list[dict]) -> str:
+    run_id = ctx.session_id  # or a uuid
+    wt = create_worktree(run_id=run_id, agent_name="writer_llm_patch")
+
+    try:
+        # 1) generate diff (inside the worktree context)
+        patcher = ctx.subagents.get("llm_patch")
+        res = await patcher.run(ctx, input=goal, meta={"workdir": str(wt.path), "candidates": candidates, "max_files": 6})
+        if not res.ok:
+            return f"implement: patch generation failed: {res.meta}"
+
+        # 2) apply diff in worktree
+        ok_apply, out_apply = apply_unified_diff(res.output, repo_root=wt.path)
+        if not ok_apply:
+            return f"implement: git apply failed:\n{out_apply}"
+
+        # 3) gates in worktree (compile/import; pytest optional)
+        plan = GatePlan(import_check=True, compile_check=True, pytest_paths=[])
+        gates = run_gates(plan)
+
+        # 4) produce final diff
+        diff = worktree_diff(wt)
+
+        # ---- NEW: persist diff into agent state ----
+        state_dir = Path(".agent_state")
+        state_dir.mkdir(parents=True, exist_ok=True)
+
+        diff_path = state_dir / f"patch_{run_id}.diff"
+        diff_path.write_text(diff, encoding="utf-8")
+
+        # pointer to latest patch (optional but nice)
+        (state_dir / "last_patch_path.txt").write_text(str(diff_path), encoding="utf-8")
+
+        # ---- append modules history (learning memory) ----
+        hist = state_dir / "modules_history.json"
+
+        data = {"patches": []}
+        if hist.exists():
+            data = json.loads(hist.read_text(encoding="utf-8"))
+
+        data["patches"].append({
+            "run_id": run_id,
+            "path": str(diff_path),
+            "gates_ok": gates.ok,
+            "diff_chars": len(diff),
+        })
+
+        hist.write_text(json.dumps(data, indent=2), encoding="utf-8")
+        # --------------------------------------------
+
+        return (
+            f"implement: ok_apply={ok_apply} gates_ok={gates.ok}\n"
+            f"diff_chars={len(diff)}\n"
+            f"diff_saved={diff_path}\n"
+            f"gates={list(gates.details.keys())}\n"
+            f"(next step: /adopt to apply to main)\n"
+        )
+
+    finally:
+        cleanup_worktree(wt, prune_branch=False)
 
 async def plan_and_queue(ctx, user_goal: str) -> List[str]:
     """
@@ -17,6 +91,9 @@ async def plan_and_queue(ctx, user_goal: str) -> List[str]:
 
     tasks = res.output
     lines = []
+    state = getattr(ctx, "workbench_run_state", None)
+    if state is not None:
+        state["goal"] = user_goal
     for t in tasks:
         ctx.task_queue.add(t["kind"], t["title"], t["input"])
         lines.append(f"queued: {t['kind']} - {t['title']}")
@@ -39,19 +116,116 @@ async def run_next_task(ctx) -> str:
 
     try:
         if t.kind == "search":
-            # Run repo_grep + (optional) more deterministic scanners in parallel
+            query = str(t.input).strip()
+            # Run repo_grep (literal substring) and BM25 (index) in parallel
             calls = [
-                ("repo_grep", str(t.input), {"root": ".", "limit": 25, "regex": False}),
+                ("repo_grep", query, {"root": ".", "limit": 25, "regex": False}),
             ]
             results: List[SubagentResult] = await ctx.orchestrator.run_many(
                 ctx,
                 calls,
                 max_concurrency=ctx.max_parallel_subagents,
             )
+            bm = await ctx.subagents.get("bm25").run(ctx, input=str(t.input), meta={"k": 20})
+            t.meta["bm25_candidates"] = bm.output
             t.status = "done"
-            return f"{t.id} done: search\n" + "\n".join([f"- {r.name}: {r.meta.get('count')} hits" for r in results])
+            return f"{t.id} done: search\n- bm25: {len(bm.output)} hits\n  top: " + ", ".join([x["path"] for x in bm.output[:5]])
 
-        # Stubbed tasks (tomorrow: wire actual agents)
+
+        if t.kind == "analyze":
+            goal = str(t.input).strip()
+            state = getattr(ctx, "workbench_run_state", None) or {}
+            state["goal"] = goal
+            if hasattr(ctx, "workbench_run_state"):
+                ctx.workbench_run_state.update(state)
+            if ctx.model and Agent is not None:
+                async with ctx.model_limiter:
+                    agent = Agent(model=ctx.model)
+                    agent = agent.with_retries(0)
+                    result = await agent.run(
+                        f"Clarify this goal into a short, concrete one-paragraph spec (what to build, what success looks like). Goal: {goal}"
+                    )
+                spec = result.output if hasattr(result, "output") else str(result)
+                state["analyze_spec"] = spec
+                if hasattr(ctx, "workbench_run_state"):
+                    ctx.workbench_run_state.update(state)
+                t.status = "done"
+                return f"{t.id} done: analyze\n{spec[:400]}..."
+            t.status = "done"
+            return f"{t.id} done: analyze (no model; goal stored)"
+
+        if t.kind == "design":
+            state = getattr(ctx, "workbench_run_state", None) or {}
+            goal = state.get("goal", str(t.input))
+            spec = state.get("analyze_spec", "")
+            bm25 = state.get("search_bm25_hits", [])[:10]
+            repo_hits = state.get("search_repo_hits", [])
+            files_ctx = ""
+            if bm25:
+                files_ctx = "Relevant paths (from search): " + ", ".join(d for d, _ in bm25)
+            if repo_hits and isinstance(repo_hits, list):
+                flat = []
+                for r in repo_hits:
+                    if isinstance(r, list):
+                        flat.extend([x.get("file", x) if isinstance(x, dict) else str(x) for x in r])
+                    else:
+                        flat.append(str(r))
+                if flat:
+                    files_ctx += "\nRepo grep files: " + ", ".join(flat[:15])
+            if ctx.model and Agent is not None:
+                async with ctx.model_limiter:
+                    agent = Agent(model=ctx.model)
+                    agent = agent.with_retries(0)
+                    result = await agent.run(
+                        f"Goal: {goal}\n{spec}\n{files_ctx}\n\n"
+                        "Output a short approach (2-3 sentences) then a JSON array of file changes. "
+                        "Format: {\"approach\": \"...\", \"changes\": [{\"path\": \"rel/path\", \"action\": \"edit\" or \"create\", \"description\": \"what to do\"}]}. "
+                        "Only include the JSON object, no markdown."
+                    )
+                raw = result.output if hasattr(result, "output") else str(result)
+                raw = raw.strip()
+                if "```" in raw:
+                    raw = raw.split("```")[1].replace("json", "").strip()
+                try:
+                    design = json.loads(raw)
+                    state["design"] = design
+                    if hasattr(ctx, "workbench_run_state"):
+                        ctx.workbench_run_state.update(state)
+                except json.JSONDecodeError:
+                    state["design"] = {"approach": raw[:500], "changes": []}
+                    if hasattr(ctx, "workbench_run_state"):
+                        ctx.workbench_run_state.update(state)
+                approach = design.get("approach", "")[:300]
+                changes = design.get("changes", [])
+                t.status = "done"
+                return f"{t.id} done: design\n{approach}\nchanges: {len(changes)} files"
+            t.status = "done"
+            return f"{t.id} done: design (no model)"
+
+        if t.kind == "implement":
+            # find the original goal; simplest: use t.input as goal
+            candidates = []
+            # pull from previous tasks if you want; quick hack:
+            for prev in ctx.task_queue.list():
+                if prev.kind == "search" and prev.meta.get("bm25_candidates"):
+                    candidates = prev.meta["bm25_candidates"]
+                    break
+            out = await _implement_in_worktree(ctx, str(t.input), candidates)
+            t.status = "done"
+            return f"{t.id} done: implement\n{out}"
+
+        if t.kind == "gates":
+            try:
+                from agent_ext.self_improve.gates import run_gates
+                from agent_ext.self_improve.models import GatePlan
+            except ImportError:
+                t.status = "done"
+                return f"{t.id} done: gates (self_improve not available)"
+            gates = run_gates(GatePlan(import_check=True, compile_check=True, pytest_paths=[]))
+            t.status = "done"
+            return f"{t.id} done: gates\nok={gates.ok}\n{gates.details}"
+
+        # Unknown task kind
         t.status = "done"
         return f"{t.id} done: {t.kind} (stub)"
 

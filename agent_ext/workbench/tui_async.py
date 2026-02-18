@@ -58,6 +58,7 @@ async def run_tui(ctx) -> None:
                     "/assemble <task_type> <text>",
                     "/exec <task_type> <text>",
                     "/quit",
+                    "/adopt <diff>",
                 ]),
                 title="commands"
             ))
@@ -71,6 +72,17 @@ async def run_tui(ctx) -> None:
             console.print(Panel("\n".join(ctx.subagents.list()), title="subagents"))
             continue
 
+        if msg == "/adopt":
+            from pathlib import Path
+            from agent_ext.self_improve.patching import apply_unified_diff
+
+            diff = Path(".agent_state/last_patch.diff").read_text(encoding="utf-8")
+            ok, out = apply_unified_diff(diff, repo_root=Path("."))
+            if not ok:
+                console.print(Panel(f"adopt failed: {out}", title="adopt"))
+                continue
+            console.print(Panel(f"adopted patch", title="adopt"))
+            continue
         if msg == "/tasks":
             console.print(_tasks_table(ctx))
             continue
