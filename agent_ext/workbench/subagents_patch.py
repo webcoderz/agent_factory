@@ -62,21 +62,12 @@ CONTEXT SNIPPETS:
 {chr(10).join(snippets) if snippets else "(no snippets)"}
 """.strip()
 
-        # Important: limit concurrency; use pydantic-ai Agent so OpenAIChatModel works
+        # Use pydantic-ai Agent only (OpenAIChatModel.request() has different signature by version)
         async with ctx.model_limiter:
-            text_out = None
-            try:
-                from pydantic_ai import Agent
-                agent = Agent(model=ctx.model)
-                result = await agent.run(prompt)
-                text_out = getattr(result, "output", None) or str(result)
-            except Exception:
-                if hasattr(ctx.model, "request"):
-                    resp = await ctx.model.request(prompt)
-                    text_out = getattr(resp, "output", None) or getattr(resp, "content", None) or str(resp)
-                else:
-                    resp = await ctx.model(prompt)
-                    text_out = str(resp)
+            from pydantic_ai import Agent
+            agent = Agent(model=ctx.model)
+            result = await agent.run(prompt)
+            text_out = getattr(result, "output", None) or str(result)
 
         diff = (text_out or "").strip()
         ok = diff.startswith("diff --git") or diff.startswith("--- ")
