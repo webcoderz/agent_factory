@@ -24,10 +24,11 @@ def run_import_check(*, cwd: Path | None = None) -> tuple[bool, str]:
 
 
 def run_compile_check(*, cwd: Path | None = None) -> tuple[bool, str]:
+    # Compile agent_ext and repo root (agent_patterns package lives at root, no agent_patterns/ dir)
     kw = {"capture_output": True, "text": True}
     if cwd is not None:
         kw["cwd"] = str(cwd)
-    p = subprocess.run([sys.executable, "-m", "compileall", "-q", "agent_ext", "agent_patterns"], **kw)
+    p = subprocess.run([sys.executable, "-m", "compileall", "-q", "."], **kw)
     ok = p.returncode == 0
     return ok, (p.stdout + "\n" + p.stderr).strip()
 

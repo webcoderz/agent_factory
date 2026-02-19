@@ -53,6 +53,31 @@ class _LiveSpinner:
         yield Group(self._spinner.render(t), text)
 
 
+class _LiveTraceView:
+    """Shows the most recent LLM trace. Implement (llm_patch) streams into the trace; analyze/design append after the full response."""
+
+    def __init__(self, ctx, max_lines: int = 22):
+        self._ctx = ctx
+        self._max_lines = max_lines
+
+    def __rich_console__(self, console: Console, options):
+        traces = getattr(self._ctx, "llm_traces", [])
+        if not traces:
+            yield Panel("[dim]Waiting for LLM…[/]", title="[bold]LLM trace[/]", border_style="dim", padding=(0, 1))
+            return
+        entry = traces[-1]
+        kind = entry.get("kind", "?")
+        prompt = (entry.get("prompt") or "").strip()
+        response = (entry.get("response") or "").strip()
+        half = self._max_lines // 2
+        prompt_lines = prompt.splitlines()[:half]
+        response_lines = response.splitlines()[:half]
+        prompt_preview = "\n".join(prompt_lines) + ("\n…" if len(prompt.splitlines()) > half else "")
+        response_preview = "\n".join(response_lines) + ("\n…" if len(response.splitlines()) > half else "")
+        body = f"[bold magenta]{kind}[/]\n[dim]in:[/] {prompt_preview}\n[dim]out:[/] {response_preview}"
+        yield Panel(body, title="[bold]LLM trace[/]", border_style="magenta", padding=(0, 1))
+
+
 # Which subagents run for each task kind (for display)
 TASK_SUBAGENTS = {
     "analyze": "LLM (clarify goal)",
@@ -229,12 +254,13 @@ async def run_tui(ctx) -> None:
 
             outs: List[str] = []
             run_message: List[str] = ["Starting…"]
-            live_renderable = Panel(
+            run_spinner_panel = Panel(
                 _LiveSpinner(run_message, spinner_name=RUN_SPINNER),
                 title="[bold yellow] run [/]",
                 border_style="yellow",
                 padding=(0, 1),
             )
+            live_renderable = Group(run_spinner_panel, _LiveTraceView(ctx))
 
             with Live(live_renderable, refresh_per_second=LIVE_REFRESH_PER_SECOND, console=console):
                 for i in range(max(1, count)):

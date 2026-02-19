@@ -22,8 +22,9 @@ from agent_ext.cog.scoring import score_patch, touched_files_from_diff
 from pathlib import Path
 
 LLM_TRACE_MAX = 30
-LLM_TRACE_PROMPT_LEN = 500
-LLM_TRACE_RESPONSE_LEN = 600
+# Store enough for debugging; trace is appended after full response (not streamed)
+LLM_TRACE_PROMPT_LEN = 8_000
+LLM_TRACE_RESPONSE_LEN = 12_000
 
 
 def _append_llm_trace(ctx, kind: str, prompt: str, response: str) -> None:
@@ -125,7 +126,7 @@ async def _implement_in_worktree(ctx, goal: str, candidates: list[dict], strateg
             )
         # ------------------------------
         else:
-
+            keep_msg = f"worktree_kept={wt.path}\n" if bool(int(os.getenv("KEEP_WORKTREE", "0"))) else ""
             return (
                 f"implement: ok_apply={ok_apply} gates_ok={gates.ok}\n"
                 f"diff_saved={diff_path}\n"
@@ -133,10 +134,20 @@ async def _implement_in_worktree(ctx, goal: str, candidates: list[dict], strateg
                 f"threshold={threshold}\n"
                 f"AUTO_ADOPT={AUTO_ADOPT}\n"
                 f"AUTO_PUSH_BRANCH={AUTO_PUSH_BRANCH}\n"
+                f"{keep_msg}"
             )
 
     finally:
-        cleanup_worktree(wt, prune_branch=False)
+        # Optional: keep worktree for inspection at .agent_state/worktrees/<run_id>/writer_llm_patch/
+        keep = bool(int(os.getenv("KEEP_WORKTREE", "0")))
+        state_dir = Path(".agent_state")
+        state_dir.mkdir(parents=True, exist_ok=True)
+        (state_dir / "last_worktree_path.txt").write_text(str(wt.path), encoding="utf-8")
+        if not keep:
+            cleanup_worktree(wt, prune_branch=False)
+        else:
+            # Leave worktree in place; user can inspect or remove manually
+            pass
 
 async def plan_and_queue(ctx, user_goal: str) -> List[str]:
     """

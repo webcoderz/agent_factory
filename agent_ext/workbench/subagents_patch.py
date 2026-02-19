@@ -4,6 +4,8 @@ from dataclasses import dataclass
 from pathlib import Path
 from typing import Any, Dict, List, Optional
 
+from .loop import LLM_TRACE_MAX, LLM_TRACE_PROMPT_LEN, LLM_TRACE_RESPONSE_LEN
+
 @dataclass
 class SubagentResult:
     ok: bool
@@ -49,39 +51,57 @@ class LLMPatchSubagent:
         strategy_block = f"\nSTRATEGY (follow this approach):\n{strategy}\n" if strategy else ""
 
         prompt = f"""
-You are editing a git repository. Produce a SINGLE unified diff that implements the goal.
+You are editing a git repository. Your reply must be exactly one unified diff and nothing else.
 {strategy_block}
 GOAL:
 {goal}
 
-RULES:
-- Output ONLY the raw unified diff. No markdown, no code fences (no ```), no explanation before or after.
-- Start with "diff --git a/path b/path" or "--- path" and end with the last hunk line.
-- Keep changes minimal. Use standard unified diff format: ---/+++ headers, @@ hunk headers, then context lines (space), +add, -remove.
-- For new files use --- /dev/null and +++ b/path.
-- Prefer modifying existing code rather than inventing new frameworks. Ensure code compiles.
+CRITICAL — output format:
+- Your entire response must be the raw unified diff only. No introductory sentence, no "Here is the diff", no markdown, no code fences (no ```), no explanation after.
+- Start the first line with "diff --git a/path b/path" or "--- path". Include @@ hunk headers and +/− lines. End with the last hunk line.
+- Example shape (minimal): --- a/file.py\\n+++ b/file.py\\n@@ -1,3 +1,4 @@\\n context\\n+new line\\n context
+- Keep changes minimal. For new files use --- /dev/null and +++ b/path. Prefer modifying existing code; ensure code compiles.
 
 CONTEXT SNIPPETS:
 {chr(10).join(snippets) if snippets else "(no snippets)"}
 """.strip()
 
-        # Use pydantic-ai Agent only (OpenAIChatModel.request() has different signature by version)
+        # Use pydantic-ai Agent with streaming so the TUI can show response as it arrives
+        traces = getattr(ctx, "llm_traces", None)
+        trace_entry: Optional[Dict[str, Any]] = None
+        if traces is not None:
+            if len(traces) >= LLM_TRACE_MAX:
+                traces.pop(0)
+            trace_entry = {
+                "kind": "llm_patch",
+                "prompt": (prompt or "")[:LLM_TRACE_PROMPT_LEN],
+                "response": "",
+            }
+            traces.append(trace_entry)
+
         async with ctx.model_limiter:
             from pydantic_ai import Agent
             agent = Agent(model=ctx.model)
-            result = await agent.run(prompt)
-            text_out = getattr(result, "output", None) or str(result)
-
-        # Surface LLM trace for TUI
-        traces = getattr(ctx, "llm_traces", None)
-        if traces is not None:
-            if len(traces) >= 30:
-                traces.pop(0)
-            traces.append({
-                "kind": "llm_patch",
-                "prompt": (prompt or "")[:500],
-                "response": (text_out or "")[:600],
-            })
+            text_out = ""
+            use_stream = getattr(agent, "run_stream", None) is not None
+            if use_stream:
+                try:
+                    async with agent.run_stream(prompt) as result:
+                        async for text in result.stream_text():
+                            text_out = text
+                            if trace_entry is not None:
+                                trace_entry["response"] = (text or "")[:LLM_TRACE_RESPONSE_LEN]
+                except Exception as stream_err:
+                    use_stream = False
+                    text_out = getattr(stream_err, "output", "") or str(stream_err)
+                    if trace_entry is not None:
+                        trace_entry["response"] = (text_out or "")[:LLM_TRACE_RESPONSE_LEN]
+                    raise
+            if not use_stream or not text_out:
+                result = await agent.run(prompt)
+                text_out = getattr(result, "output", None) or str(result)
+                if trace_entry is not None:
+                    trace_entry["response"] = (text_out or "")[:LLM_TRACE_RESPONSE_LEN]
 
         diff = (text_out or "").strip()
         ok = diff.startswith("diff --git") or diff.startswith("--- ")

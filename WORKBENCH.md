@@ -19,6 +19,8 @@ In the TUI
 
 - adjust parallel: /parallel 8
 
+- LLM trace streams during implement; for DAG/streaming hooks use `agent_ext.workbench.streaming` (`run_agent_streaming`, `iter_agent_dag`).
+
 This will already feel like: goal → plan → concurrent repo scans → iterative execution.
 
 ---

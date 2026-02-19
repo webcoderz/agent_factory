@@ -6,34 +6,16 @@ from pathlib import Path
 import sys
 
 
-def sanitize_diff_for_apply(diff_text: str) -> str:
-    """
-    Extract a single valid unified diff from LLM output (may contain markdown, commentary, trailing text).
-    - Strips markdown code fences (```diff, ```patch, ```).
-    - Keeps only lines that look like a unified diff (---/+++, diff --git, @@ hunks, context).
-    - Normalizes line endings to LF so git apply doesn't see corrupt patch at line N.
-    """
-    if not diff_text or not diff_text.strip():
-        return ""
-    raw = diff_text.strip()
-    # Strip markdown code block if present
-    for marker in ("```diff", "```patch", "```"):
-        if raw.startswith(marker):
-            raw = raw[len(marker) :].lstrip("\r\n")
-        if raw.endswith("```"):
-            raw = raw[: raw.rfind("```")].rstrip("\r\n")
-    # Normalize line endings to LF
-    raw = raw.replace("\r\n", "\n").replace("\r", "\n")
-    lines = raw.split("\n")
-    # Find first line that starts a unified diff (--- or diff --git)
+def _extract_diff_from_lines(lines: list[str]) -> str:
+    """From a list of lines, find a contiguous unified diff and return it (with trailing newline)."""
     start = None
     for i, line in enumerate(lines):
         if line.startswith("--- ") or line.startswith("diff --git "):
             start = i
             break
     if start is None:
-        return raw
-    # End at last line that is part of a valid unified diff; stop at first non-diff line to avoid "corrupt patch"
+        return ""
+
     def is_diff_line(ln: str) -> bool:
         if ln.startswith("--- ") or ln.startswith("+++ ") or ln.startswith("diff --git "):
             return True
@@ -56,6 +38,40 @@ def sanitize_diff_for_apply(diff_text: str) -> str:
         else:
             break
     return "\n".join(lines[start:end]) + "\n" if end > start else ""
+
+
+def sanitize_diff_for_apply(diff_text: str) -> str:
+    """
+    Extract a single valid unified diff from LLM output (may contain markdown, commentary, trailing text).
+    - Strips markdown code fences (```diff, ```patch, ```); also looks inside response for fenced blocks.
+    - Keeps only lines that look like a unified diff (---/+++, diff --git, @@ hunks, context).
+    - Normalizes line endings to LF so git apply doesn't see corrupt patch at line N.
+    """
+    if not diff_text or not diff_text.strip():
+        return ""
+    raw = diff_text.strip()
+    # Normalize line endings first
+    raw = raw.replace("\r\n", "\n").replace("\r", "\n")
+    # Strip leading/trailing markdown fence
+    for marker in ("```diff", "```patch", "```"):
+        if raw.startswith(marker):
+            raw = raw[len(marker) :].lstrip("\n")
+        if raw.endswith("```"):
+            raw = raw[: raw.rfind("```")].rstrip("\n")
+    lines = raw.split("\n")
+    out = _extract_diff_from_lines(lines)
+    if out:
+        return out
+    # No ---/+++ at start: look for a fenced block in the middle that contains a diff
+    parts = re.split(r"```(?:\w*)\s*\n?", raw)
+    for block in parts:
+        block = block.strip()
+        if "@@" not in block or ("--- " not in block and "+++ " not in block and "diff --git " not in block):
+            continue
+        out = _extract_diff_from_lines(block.split("\n"))
+        if out and "@@" in out:
+            return out
+    return ""
 
 
 def apply_unified_diff(diff_text: str, repo_root: Path = Path(".")) -> tuple[bool, str]:
