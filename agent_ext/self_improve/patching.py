@@ -29,6 +29,9 @@ def _extract_diff_from_lines(lines: list[str]) -> str:
             return True
         if len(ln) >= 1 and ln[0] == "-" and not ln.startswith("--- "):  # removed line
             return True
+        # Git diff header lines (between "diff --git" and "---"/"+++")
+        if ln.startswith("index ") or ln.startswith("new file mode ") or ln.startswith("old mode ") or ln.startswith("deleted file mode "):
+            return True
         return False
 
     end = start

@@ -189,12 +189,25 @@ async def run_tui(ctx) -> None:
             from pathlib import Path
             from agent_ext.self_improve.patching import apply_unified_diff
 
-            diff = Path(".agent_state/last_patch.diff").read_text(encoding="utf-8")
+            state_dir = Path(".agent_state")
+            path_file = state_dir / "last_patch_path.txt"
+            if path_file.exists():
+                diff_path = Path(path_file.read_text(encoding="utf-8").strip())
+            else:
+                diff_path = state_dir / "last_patch.diff"
+            if not diff_path.exists():
+                console.print(Panel(
+                    "No saved patch. Run /run and complete an implement step first (patch is saved to .agent_state/patch_<run_id>.diff).",
+                    title="adopt",
+                    border_style="yellow",
+                ))
+                continue
+            diff = diff_path.read_text(encoding="utf-8")
             ok, out = apply_unified_diff(diff, repo_root=Path("."))
             if not ok:
                 console.print(Panel(f"adopt failed: {out}", title="adopt"))
                 continue
-            console.print(Panel(f"adopted patch", title="adopt"))
+            console.print(Panel(f"adopted patch from {diff_path}", title="adopt"))
             continue
         if msg == "/tasks":
             console.print(_tasks_table(ctx))
