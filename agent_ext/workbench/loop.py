@@ -21,6 +21,24 @@ from agent_ext.workbench.adopt import apply_diff_to_repo, commit_and_push
 from agent_ext.cog.scoring import score_patch, touched_files_from_diff
 from pathlib import Path
 
+LLM_TRACE_MAX = 30
+LLM_TRACE_PROMPT_LEN = 500
+LLM_TRACE_RESPONSE_LEN = 600
+
+
+def _append_llm_trace(ctx, kind: str, prompt: str, response: str) -> None:
+    traces = getattr(ctx, "llm_traces", None)
+    if traces is None:
+        return
+    if len(traces) >= LLM_TRACE_MAX:
+        traces.pop(0)
+    traces.append({
+        "kind": kind,
+        "prompt": (prompt or "")[:LLM_TRACE_PROMPT_LEN],
+        "response": (response or "")[:LLM_TRACE_RESPONSE_LEN],
+    })
+
+
 async def _implement_in_worktree(ctx, goal: str, candidates: list[dict], strategy: str | None = None) -> str:
     run_id = ctx.session_id  # or a uuid
     wt = create_worktree(run_id=run_id, agent_name="writer_llm_patch")
@@ -179,12 +197,12 @@ async def run_next_task(ctx) -> str:
             if hasattr(ctx, "workbench_run_state"):
                 ctx.workbench_run_state.update(state)
             if ctx.model and Agent is not None:
+                analyze_prompt = f"Clarify this goal into a short, concrete one-paragraph spec (what to build, what success looks like). Goal: {goal}"
                 async with ctx.model_limiter:
                     agent = Agent(model=ctx.model)
-                    result = await agent.run(
-                        f"Clarify this goal into a short, concrete one-paragraph spec (what to build, what success looks like). Goal: {goal}"
-                    )
+                    result = await agent.run(analyze_prompt)
                 spec = result.output if hasattr(result, "output") else str(result)
+                _append_llm_trace(ctx, "analyze", analyze_prompt, spec)
                 state["analyze_spec"] = spec
                 if hasattr(ctx, "workbench_run_state"):
                     ctx.workbench_run_state.update(state)
@@ -212,15 +230,17 @@ async def run_next_task(ctx) -> str:
                 if flat:
                     files_ctx += "\nRepo grep files: " + ", ".join(flat[:15])
             if ctx.model and Agent is not None:
+                design_prompt = (
+                    f"Goal: {goal}\n{spec}\n{files_ctx}\n\n"
+                    "Output a short approach (2-3 sentences) then a JSON array of file changes. "
+                    "Format: {\"approach\": \"...\", \"changes\": [{\"path\": \"rel/path\", \"action\": \"edit\" or \"create\", \"description\": \"what to do\"}]}. "
+                    "Only include the JSON object, no markdown."
+                )
                 async with ctx.model_limiter:
                     agent = Agent(model=ctx.model)
-                    result = await agent.run(
-                        f"Goal: {goal}\n{spec}\n{files_ctx}\n\n"
-                        "Output a short approach (2-3 sentences) then a JSON array of file changes. "
-                        "Format: {\"approach\": \"...\", \"changes\": [{\"path\": \"rel/path\", \"action\": \"edit\" or \"create\", \"description\": \"what to do\"}]}. "
-                        "Only include the JSON object, no markdown."
-                    )
+                    result = await agent.run(design_prompt)
                 raw = result.output if hasattr(result, "output") else str(result)
+                _append_llm_trace(ctx, "design", design_prompt, raw)
                 raw = raw.strip()
                 if "```" in raw:
                     raw = raw.split("```")[1].replace("json", "").strip()

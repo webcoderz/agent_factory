@@ -72,6 +72,17 @@ CONTEXT SNIPPETS:
             result = await agent.run(prompt)
             text_out = getattr(result, "output", None) or str(result)
 
+        # Surface LLM trace for TUI
+        traces = getattr(ctx, "llm_traces", None)
+        if traces is not None:
+            if len(traces) >= 30:
+                traces.pop(0)
+            traces.append({
+                "kind": "llm_patch",
+                "prompt": (prompt or "")[:500],
+                "response": (text_out or "")[:600],
+            })
+
         diff = (text_out or "").strip()
         ok = diff.startswith("diff --git") or diff.startswith("--- ")
         return SubagentResult(ok=ok, name=self.name, output=diff, meta={"files_considered": [c["path"] for c in candidates]})

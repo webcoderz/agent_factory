@@ -4,7 +4,7 @@
     "config.py": {
       "sha256": "90306845a99c57930380f262b74b9e20e2faa04ba8913bc1ac7361272bbd8389",
       "size": 644,
-      "mtime": 1771354108.8470933,
+      "mtime": 1771459582.0031831,
       "lang": "python",
       "skipped": false
     },
@@ -16,9 +16,9 @@
       "skipped": false
     },
     "pyproject.toml": {
-      "sha256": "9bcd3c6b66506fb038c5a3d429e8173ebe1c69cc325223bd5d192cd020196c3e",
-      "size": 430,
-      "mtime": 1771450418.830992,
+      "sha256": "7d0fffedc73bc8afe467188359453eacac9233d010b2613ce55f2dbf5f543f7c",
+      "size": 1118,
+      "mtime": 1771459720.0520713,
       "lang": "toml",
       "skipped": false
     },
@@ -30,23 +30,23 @@
       "skipped": false
     },
     "run_context.py": {
-      "sha256": "23271d9b8133aeeccd975f3a0803d2029bd917ac05c59ee87f0e0f03d613ca92",
-      "size": 2019,
-      "mtime": 1771361594.95345,
+      "sha256": "2d493becbaf7d69182d709293e3c1fa85250d3595c4d811ede51cd739cffa7fd",
+      "size": 2147,
+      "mtime": 1771459582.0031831,
       "lang": "python",
       "skipped": false
     },
     "WORKBENCH.md": {
-      "sha256": "d7337b4fe06e94954e09ccbf6357899b7e2e793c44359528aba1193d209a0181",
-      "size": 517,
-      "mtime": 1771446104.5913987,
+      "sha256": "f3c6a07253b1de7f3455df8044e199c93a8477a23ab619900dc2690d93a8c427",
+      "size": 888,
+      "mtime": 1771457742.2638936,
       "lang": "markdown",
       "skipped": false
     },
     "__init__.py": {
       "sha256": "4a3bb649304b72138ea8817eff53fd26278a0e19bb4b8e659fc3b7178efcde9d",
       "size": 388,
-      "mtime": 1771359656.7702756,
+      "mtime": 1771459562.3122048,
       "lang": "python",
       "skipped": false
     },
@@ -58,9 +58,9 @@
       "skipped": false
     },
     "agent_ext/__init__.py": {
-      "sha256": "9f85f866c4af59ee52e89c8e59f7f3f6b0aa086c62f553f7635a459620c25148",
-      "size": 4426,
-      "mtime": 1771447069.8016455,
+      "sha256": "a86b56673b5412e85b81fc6f39e3bf50782ce45a59a178620f42c6836f31d91d",
+      "size": 4451,
+      "mtime": 1771459417.786933,
       "lang": "python",
       "skipped": false
     },
@@ -618,9 +618,9 @@
       "skipped": false
     },
     "agent_ext/self_improve/gates.py": {
-      "sha256": "0874ef58a4e77eba1d3ee32e4215b4e41ea389b54df8f36499bd5a4452023150",
-      "size": 1726,
-      "mtime": 1771443629.0490046,
+      "sha256": "2a440d17ed86b22986a290ae85f297d625a2bf2bbd1210c8fa9319cf1233aec2",
+      "size": 2135,
+      "mtime": 1771457866.4732556,
       "lang": "python",
       "skipped": false
     },
@@ -632,9 +632,9 @@
       "skipped": false
     },
     "agent_ext/self_improve/patching.py": {
-      "sha256": "b39dc39353fb52ac59277d94807dd759b080f2707d98bb9d028e238214406d79",
-      "size": 2938,
-      "mtime": 1771450589.8782816,
+      "sha256": "8e898bf0ebe3f2798fa3563e408e1010657940ce8c82ed6a7799bcadce4c7e44",
+      "size": 3442,
+      "mtime": 1771457848.0283372,
       "lang": "python",
       "skipped": false
     },
@@ -807,9 +807,9 @@
       "skipped": false
     },
     "agent_ext/workbench/loop.py": {
-      "sha256": "af17fa5a0e15a548b993247ba7250cd475d35bab5654ded3430921797f693a67",
-      "size": 11907,
-      "mtime": 1771457013.0505555,
+      "sha256": "f232bfb83537aa7c35893ea2a7fcad220f53a2fd3dffaef6e94f615661147d36",
+      "size": 12604,
+      "mtime": 1771459956.1332793,
       "lang": "python",
       "skipped": false
     },
@@ -835,9 +835,9 @@
       "skipped": false
     },
     "agent_ext/workbench/runtime.py": {
-      "sha256": "755fb39944700ea745e8a22d5efecb07ffa798ace2e007d03b1cd29117b71cf3",
-      "size": 4719,
-      "mtime": 1771449533.7360094,
+      "sha256": "dba5c03638f144ae8adfc518704a1054e80c8566f4318897cacf66c82d1da536",
+      "size": 5085,
+      "mtime": 1771459935.34057,
       "lang": "python",
       "skipped": false
     },
@@ -856,9 +856,9 @@
       "skipped": false
     },
     "agent_ext/workbench/tui_async.py": {
-      "sha256": "508b17a53b5507816d5d64f3655ae70bb1eacf53a5ad67c8cdfe14417cfc7ead",
-      "size": 9767,
-      "mtime": 1771456405.282829,
+      "sha256": "aeb1dc438c99837e3d11bd03070fe33f3e0bd45cc557b8e2a61e46c631f0814c",
+      "size": 14212,
+      "mtime": 1771459986.5686398,
       "lang": "python",
       "skipped": false
     },
@@ -996,23 +996,23 @@
       "skipped": false
     },
     "agent_ext/workbench/subagents_patch.py": {
-      "sha256": "ff5d8c3b3d89b054b933f2cc5626f143f398453c0bf15e956d6c89460a034c55",
-      "size": 2900,
-      "mtime": 1771456061.9232829,
+      "sha256": "82512ee44b989a7b2b6ac7cb4507c5600b54d48102fe3205369a37cc78a782b0",
+      "size": 3273,
+      "mtime": 1771459965.1182857,
       "lang": "python",
       "skipped": false
     },
     "agent_ext/cog/daemon.py": {
-      "sha256": "b332271c072b2c7e902e6e54c74d2b470f752c887ad3e0cbb368bdb231761079",
-      "size": 1726,
-      "mtime": 1771456545.3275213,
+      "sha256": "64e3d1ec88ad97539eed56bf01eba540a531cf3f5088cabe071142ba0653c3c6",
+      "size": 2764,
+      "mtime": 1771458710.2630525,
       "lang": "python",
       "skipped": false
     },
     "agent_ext/cog/loop_v2.py": {
-      "sha256": "ac10bea4537f50a75ac162fbe6152b6ae9d5c0d452192254b617d87590e3ebcb",
-      "size": 6917,
-      "mtime": 1771455793.8587077,
+      "sha256": "4782204f35e3e5b4d42e000c272e354d890e9e7d952c23ab5050b688b9bdb81f",
+      "size": 7182,
+      "mtime": 1771458946.9810278,
       "lang": "python",
       "skipped": false
     },
@@ -1059,9 +1059,23 @@
       "skipped": false
     },
     "agent_ext/workbench/adopt.py": {
-      "sha256": "8b7139f4d42da17804dd7676f4f52394212f40b84254883f1e279d6271f01947",
-      "size": 1943,
-      "mtime": 1771456606.287428,
+      "sha256": "f09f892186ab985472ea0961075971afa3d1ca1d5f2b6ee1aa3d95d2ec0ddb85",
+      "size": 4593,
+      "mtime": 1771457724.3028445,
+      "lang": "python",
+      "skipped": false
+    },
+    "docs/AUTO_AGENT.md": {
+      "sha256": "8c0127ed886a66a8db093d17bf3b118332aeddbd93ef004c5a19a7637ceaa4ee",
+      "size": 13040,
+      "mtime": 1771458585.1061425,
+      "lang": "markdown",
+      "skipped": false
+    },
+    "agent_ext/cog/__main__.py": {
+      "sha256": "779014f9f4008268fef29a0af8bea3c89f7dc410975dfe73a01324eec7bc4e89",
+      "size": 2498,
+      "mtime": 1771458669.7496405,
       "lang": "python",
       "skipped": false
     }

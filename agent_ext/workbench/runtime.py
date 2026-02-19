@@ -96,6 +96,8 @@ def build_ctx(
     ctx.commands = {}
     # Run state for plan → design → implement (search results, design output, etc.)
     ctx.workbench_run_state = {}
+    # Recent LLM call traces for TUI (prompt/response previews; capped at 30)
+    ctx.llm_traces = []
     # Self-improve: apply patches and run gates (optional)
     ctx.self_improve = SelfImproveController() if SelfImproveController else None
     # Workflow synthesis + learning

@@ -89,6 +89,13 @@ def _tasks_table(ctx) -> Table:
     return t
 
 
+def _format_llm_trace(entry: dict) -> str:
+    kind = entry.get("kind", "?")
+    prompt = entry.get("prompt", "")
+    response = entry.get("response", "")
+    return f"[bold magenta]{kind}[/]\n[dim]prompt:[/]\n{prompt}\n[dim]response:[/]\n{response}"
+
+
 async def _ainput(prompt: str) -> str:
     # Rich input is blocking; run it in a thread so we can keep an async loop.
     return await asyncio.to_thread(console.input, prompt)
@@ -128,6 +135,7 @@ async def run_tui(ctx) -> None:
                     "[cyan]/workflows[/]  list",
                     "[cyan]/assemble[/] [cyan]/exec[/]  workflow",
                     "[cyan]/adopt[/]   apply last patch",
+                    "[cyan]/traces[/] [dim][N][/]  last LLM prompt/response",
                     "[cyan]/quit[/]    exit",
                 ]),
                 title="[bold]commands[/bold]",
@@ -166,6 +174,19 @@ async def run_tui(ctx) -> None:
         if msg == "/tasks":
             console.print(_tasks_table(ctx))
             console.print("[dim]  ───[/dim]")
+            continue
+
+        if msg == "/traces" or msg.startswith("/traces "):
+            traces = getattr(ctx, "llm_traces", [])
+            n = 5
+            if msg.startswith("/traces ") and msg.split(maxsplit=1)[1].strip().isdigit():
+                n = max(1, int(msg.split(maxsplit=1)[1].strip()))
+            show = traces[-n:] if traces else []
+            if not show:
+                console.print(Panel("[dim]No LLM traces yet. Run /run (analyze, design, or implement) to generate.[/]", title="[bold]traces[/bold]", border_style="dim"))
+            else:
+                for i, entry in enumerate(reversed(show)):
+                    console.print(Panel(_format_llm_trace(entry), title=f"[bold]trace[/] {len(show) - i} ([magenta]{entry.get('kind', '?')}[/])", border_style="dim", padding=(0, 1)))
             continue
 
         if msg.startswith("/parallel "):
@@ -237,6 +258,11 @@ async def run_tui(ctx) -> None:
                         console.print(f"  [green]✓[/] [dim]{o.split(chr(10))[0]}[/]")
                     elif "failed" in o:
                         console.print(f"  [red]✗[/] [dim]{o.split(chr(10))[0]}[/]")
+            # Show last LLM trace briefly so user can see what the model saw/returned
+            traces = getattr(ctx, "llm_traces", [])
+            if traces:
+                last = traces[-1]
+                console.print(Panel(_format_llm_trace(last), title="[bold]last LLM trace[/] [dim](/traces for more)[/]", border_style="magenta", padding=(0, 1)))
             console.print()
             console.print(Panel("\n\n".join(outs), title="[bold]run[/bold]", border_style="yellow"))
             continue
