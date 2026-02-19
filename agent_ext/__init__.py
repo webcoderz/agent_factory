@@ -95,3 +95,5 @@ if LLMVisionOCREngine is not None:
     __all__.append("LLMVisionOCREngine")
 if PydanticAIAgentBase is not None:
     __all__.append("PydanticAIAgentBase")
+
+__version__ = "0.1.0"

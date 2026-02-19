@@ -1,6 +1,6 @@
 [project]
 name = "agent-patterns"
-version = "0.1.0"
+dynamic = ["version"]
 description = "Add your description here"
 readme = "README.md"
 requires-python = ">=3.12"
@@ -17,3 +17,23 @@ dependencies = [
     "reportlab>=4.4.10",
     "pydantic-ai>=1.60.0",
 ]
+
+[build-system]
+requires = ["hatchling"]
+build-backend = "hatchling.build"
+
+[tool.hatch.version]
+path = "agent_ext/__init__.py"
+
+# Only ship agent_ext and agent_patterns (root); exclude evals, docker.
+[tool.hatch.build.targets.wheel]
+only-include = ["agent_ext"]
+# Root __init__.py, run_context.py, config.py are the agent_patterns package (repo root = agent_patterns when installed)
+[tool.hatch.build.targets.wheel.force-include]
+"__init__.py" = "agent_patterns/__init__.py"
+"run_context.py" = "agent_patterns/run_context.py"
+"config.py" = "agent_patterns/config.py"
+
+[project.scripts]
+workbench = "agent_ext.workbench.__main__:main"
+agent-cog-daemon = "agent_ext.cog.__main__:main"

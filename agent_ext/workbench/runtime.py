@@ -19,6 +19,8 @@ from agent_ext.workflow.planner import WorkflowPlanner
 from agent_ext.workflow.executor import WorkflowExecutor
 from agent_ext.search import BM25Index, BM25Config, TokenizerConfig, RepoIndexerConfig
 from agent_ext.workbench.subagents_bm25 import BM25SearchSubagent
+from agent_ext.cog.state import CogState, RegressionMemory
+
 try:
     from agent_ext.self_improve.controller import SelfImproveController
 except Exception:
@@ -57,6 +59,11 @@ def build_ctx(
     max_parallel_subagents: int = 4,
     max_parallel_model_calls: int = 2,
 ) -> RunContext:
+    cog_state = CogState()
+    cog_state.load()
+    regression_memory = RegressionMemory()
+    regression_memory.load()
+
     ctx = RunContext(
         case_id=case_id,
         session_id=session_id,
@@ -66,6 +73,8 @@ def build_ctx(
         logger=_Logger(),
         artifacts=_Artifacts(),
         trace_id=None,
+        cog_state=cog_state,
+        regression_memory=regression_memory,
     )
 
     # Workbench attachments
@@ -83,7 +92,6 @@ def build_ctx(
     reg.register(LLMPatchSubagent())
     ctx.subagents = reg
     ctx.orchestrator = SubagentOrchestrator(reg)
-
     # Commands map (TUI)
     ctx.commands = {}
     # Run state for plan → design → implement (search results, design output, etc.)
