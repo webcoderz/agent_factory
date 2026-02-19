@@ -11,7 +11,7 @@ class Task:
     kind: str               # analyze/search/design/implement/gates/improve
     title: str
     input: Any
-    status: str = "pending" # pending/in_progress/done/failed
+    status: str = "pending"  # pending/in_progress/done/failed/cancelled
     meta: Dict[str, Any] = field(default_factory=dict)
 
 
@@ -46,4 +46,28 @@ class TaskQueue:
                 if t.status == "pending":
                     t.status = "in_progress"
                     return t
+            return None
+
+    def normalize_id(self, task_id: str) -> str:
+        """Allow 't0004' or '0004' -> 't0004'."""
+        s = (task_id or "").strip()
+        if s.isdigit():
+            return f"t{s}"
+        return s if s.startswith("t") else f"t{s}"
+
+    def get_by_id(self, task_id: str) -> Optional[Task]:
+        """Return task by id (accepts t0004 or 0004), or None."""
+        tid = self.normalize_id(task_id)
+        return next((t for t in self._tasks if t.id == tid), None)
+
+    async def cancel_by_id(self, task_id: str) -> Optional[bool]:
+        """Cancel a task by id. Returns True if it was pending and is now cancelled, False if found but not pending, None if not found. Thread-safe."""
+        tid = self.normalize_id(task_id)
+        async with self._lock:
+            for t in self._tasks:
+                if t.id == tid:
+                    if t.status == "pending":
+                        t.status = "cancelled"
+                        return True
+                    return False
             return None

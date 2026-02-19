@@ -96,6 +96,8 @@ def _status_style(status: str) -> str:
         return "yellow"
     if status == "failed":
         return "red"
+    if status == "cancelled":
+        return "dim strike"
     return "dim"
 
 
@@ -199,6 +201,7 @@ async def run_tui(ctx) -> None:
                     "[cyan]/watch[/] [dim][task_id][/]  live view of run + trace (Enter to leave)",
                     "[cyan]/ask <q>[/]  one-off question (background)",
                     "[cyan]/stop[/]   cancel background run",
+                    "[cyan]/cancel <id>[/]  cancel pending task by id (e.g. t0004)",
                     "[cyan]/quit[/]    exit",
                 ]),
                 title="[bold]commands[/bold]",
@@ -290,6 +293,22 @@ async def run_tui(ctx) -> None:
         if msg == "/tasks":
             console.print(_tasks_table(ctx))
             console.print("[dim]  ───[/dim]")
+            continue
+
+        if msg.startswith("/cancel "):
+            task_id = msg.split(maxsplit=1)[1].strip() if len(msg.split()) > 1 else ""
+            if not task_id:
+                console.print(Panel("[dim]Usage: /cancel <task_id>  e.g. /cancel t0004 or /cancel 0004[/]", title="cancel", border_style="yellow"))
+                continue
+            result = await ctx.task_queue.cancel_by_id(task_id)
+            if result is True:
+                console.print(Panel(f"[green]Task cancelled.[/] Use [cyan]/tasks[/] to see queue.", title="cancel", border_style="green"))
+            elif result is False:
+                t = ctx.task_queue.get_by_id(task_id)
+                status = t.status if t else "?"
+                console.print(Panel(f"[yellow]Task not pending (status: {status}).[/] Only pending tasks can be cancelled.", title="cancel", border_style="yellow"))
+            else:
+                console.print(Panel(f"[red]No task with id '{task_id}'.[/] Use [cyan]/tasks[/] for ids.", title="cancel", border_style="red"))
             continue
 
         if msg == "/watch" or msg.startswith("/watch "):
