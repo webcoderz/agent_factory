@@ -194,7 +194,8 @@ async def run_tui(ctx) -> None:
                     "[cyan]/workflows[/]  list",
                     "[cyan]/assemble[/] [cyan]/exec[/]  workflow",
                     "[cyan]/adopt[/]   apply last patch",
-                    "[cyan]/traces[/] [dim][N][/]  last LLM prompt/response",
+                    "[cyan]/trace[/]  [dim]last trace FULL (for debugging)[/]",
+                    "[cyan]/traces[/] [dim][N][/]  last N traces (preview)",
                     "[cyan]/watch[/] [dim][task_id][/]  live view of run + trace (Enter to leave)",
                     "[cyan]/ask <q>[/]  one-off question (background)",
                     "[cyan]/stop[/]   cancel background run",
@@ -314,6 +315,25 @@ async def run_tui(ctx) -> None:
                         pass
             continue
 
+        if msg.strip() == "/trace":
+            traces = getattr(ctx, "llm_traces", [])
+            if not traces:
+                console.print(Panel("[dim]No LLM traces yet. Run /run to generate.[/]", title="[bold]trace[/bold]", border_style="dim"))
+            else:
+                entry = traces[-1]
+                kind = entry.get("kind", "?")
+                body = _format_llm_trace(entry, truncate=False)
+                console.print(Panel(body, title=f"[bold]last trace (full)[/] [magenta]{kind}[/]", border_style="magenta", padding=(0, 1)))
+                from pathlib import Path
+                trace_file = Path(".agent_state/last_trace.txt")
+                trace_file.parent.mkdir(parents=True, exist_ok=True)
+                trace_file.write_text(
+                    f"kind: {kind}\n\n--- prompt ---\n{entry.get('prompt', '')}\n\n--- response ---\n{entry.get('response', '')}",
+                    encoding="utf-8",
+                )
+                console.print(f"[dim]Also saved to {trace_file} (open in editor to search)[/]")
+            continue
+
         if msg == "/traces" or msg.startswith("/traces "):
             traces = getattr(ctx, "llm_traces", [])
             n = 5
@@ -327,8 +347,7 @@ async def run_tui(ctx) -> None:
                 for i, entry in enumerate(reversed(show)):
                     body = _format_llm_trace(entry, truncate=True)
                     console.print(Panel(body, title=f"[bold]trace[/] {len(show) - i} ([magenta]{entry.get('kind', '?')}[/]) [dim]preview[/dim]", border_style="dim", padding=(0, 1)))
-                if n > 1 or any(len((e.get("prompt") or "") + (e.get("response") or "")) > TRACE_PREVIEW_PROMPT + TRACE_PREVIEW_RESPONSE for e in show):
-                    console.print("[dim]Previews only; full content in ctx.llm_traces[/]")
+                console.print("[dim]Use [cyan]/trace[/] for the last trace in full (and saved to .agent_state/last_trace.txt)[/]")
             continue
 
         if msg.startswith("/parallel "):
