@@ -9,7 +9,7 @@ python -m agent_ext.workbench --use-openai-chat-model --max-parallel-subagents 6
 
 In the TUI
 
-- type: build me self improving code agent
+- type: build me a self improving code agent
 
 - it queues tasks
 
