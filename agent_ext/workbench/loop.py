@@ -40,8 +40,20 @@ def _append_llm_trace(ctx, kind: str, prompt: str, response: str) -> None:
     })
 
 
-async def _implement_in_worktree(ctx, goal: str, candidates: list[dict], strategy: str | None = None) -> str:
-    run_id = ctx.session_id  # or a uuid
+async def _implement_in_worktree(
+    ctx,
+    goal: str,
+    candidates: list[dict],
+    strategy: str | None = None,
+    task_id: Optional[str] = None,
+) -> str:
+    """
+    Lifecycle: (1) Create a temporary worktree (sandbox). (2) Apply LLM diff there, run gates.
+    (3) Capture diff from worktree and save to .agent_state/patch_<run_id>.diff. (4) Optionally
+    AUTO_ADOPT: apply that file to main repo and commit+push. (5) finally: remove worktree.
+    Uses task_id in run_id when provided so concurrent implement tasks don't collide on the same worktree.
+    """
+    run_id = f"{ctx.session_id}_{task_id}" if task_id else ctx.session_id
     wt = create_worktree(run_id=run_id, agent_name="writer_llm_patch")
 
     try:
@@ -51,13 +63,20 @@ async def _implement_in_worktree(ctx, goal: str, candidates: list[dict], strateg
         if strategy:
             meta["strategy"] = strategy
         res = await patcher.run(ctx, input=goal, meta=meta)
-        if not res.ok:
-            return f"implement: patch generation failed: {res.meta}"
-
-        # 2) apply diff in worktree
-        ok_apply, out_apply = apply_unified_diff(res.output, repo_root=wt.path)
+        raw_output = (res.output or "").strip()
+        # Even if LLM didn't return something that starts with diff --git/---, try sanitizer (e.g. extract from markdown)
+        ok_apply = False
+        out_apply = ""
+        if raw_output:
+            ok_apply, out_apply = apply_unified_diff(raw_output, repo_root=wt.path)
         if not ok_apply:
-            return f"implement: git apply failed:\n{out_apply}"
+            snippet = (raw_output[:800] + ("..." if len(raw_output) > 800 else "")) if raw_output else "(empty)"
+            reason = "model output not a raw diff (no diff --git or --- at start)" if not res.ok and not raw_output else out_apply or "no unified diff found in output"
+            return (
+                f"implement: create patch failed.\n"
+                f"Reason: {reason}\n"
+                f"Model output (first 800 chars):\n{snippet}"
+            )
 
         # 3) gates in worktree (compile/import; pytest optional)
         plan = GatePlan(import_check=True, compile_check=True, pytest_paths=[])
@@ -121,7 +140,7 @@ async def _implement_in_worktree(ctx, goal: str, candidates: list[dict], strateg
 
             return (
                 f"implement: ok_apply={ok_apply} gates_ok={gates.ok}\n"
-                f"auto_adopted_and_pushed={AUTO_PUSH_BRANCH}\n"
+                f"AUTO_ADOPT: patch applied to main repo and pushed to {AUTO_PUSH_BRANCH}\n"
                 f"diff_saved={diff_path}\n"
             )
         # ------------------------------
@@ -130,6 +149,7 @@ async def _implement_in_worktree(ctx, goal: str, candidates: list[dict], strateg
             return (
                 f"implement: ok_apply={ok_apply} gates_ok={gates.ok}\n"
                 f"diff_saved={diff_path}\n"
+                f"Patch is on disk; worktree will be removed (use KEEP_WORKTREE=1 to keep). Use /adopt to apply to main repo.\n"
                 f"score={sc.score}\n"
                 f"threshold={threshold}\n"
                 f"AUTO_ADOPT={AUTO_ADOPT}\n"
@@ -138,7 +158,7 @@ async def _implement_in_worktree(ctx, goal: str, candidates: list[dict], strateg
             )
 
     finally:
-        # Optional: keep worktree for inspection at .agent_state/worktrees/<run_id>/writer_llm_patch/
+        # Patch already saved to diff_path above; safe to remove worktree (sandbox only—we never commit in it).
         keep = bool(int(os.getenv("KEEP_WORKTREE", "0")))
         state_dir = Path(".agent_state")
         state_dir.mkdir(parents=True, exist_ok=True)
@@ -177,11 +197,9 @@ async def run_next_task(ctx) -> str:
     - implement: placeholder (tomorrow we wire LLM patch gen + self_improve controller)
     - gates: placeholder
     """
-    t = ctx.task_queue.next_pending()
+    t = await ctx.task_queue.claim_next_pending()
     if not t:
         return "no pending tasks"
-
-    t.status = "in_progress"
 
     try:
         if t.kind == "search":
@@ -197,6 +215,9 @@ async def run_next_task(ctx) -> str:
             )
             bm = await ctx.subagents.get("bm25").run(ctx, input=str(t.input), meta={"k": 20})
             t.meta["bm25_candidates"] = bm.output
+            state = getattr(ctx, "workbench_run_state", None)
+            if state is not None:
+                state["search_bm25_hits"] = bm.output
             t.status = "done"
             return f"{t.id} done: search\n- bm25: {len(bm.output)} hits\n  top: " + ", ".join([x["path"] for x in bm.output[:5]])
 
@@ -230,7 +251,8 @@ async def run_next_task(ctx) -> str:
             repo_hits = state.get("search_repo_hits", [])
             files_ctx = ""
             if bm25:
-                files_ctx = "Relevant paths (from search): " + ", ".join(d for d, _ in bm25)
+                paths = [x["path"] if isinstance(x, dict) else x[0] for x in bm25]
+                files_ctx = "Relevant paths (from search): " + ", ".join(paths)
             if repo_hits and isinstance(repo_hits, list):
                 flat = []
                 for r in repo_hits:
@@ -278,9 +300,14 @@ async def run_next_task(ctx) -> str:
                     candidates = prev.meta["bm25_candidates"]
                     break
             state = getattr(ctx, "workbench_run_state", None) or {}
+            if not candidates:
+                candidates = state.get("search_bm25_hits") or []
+            if not candidates:
+                bm = await ctx.subagents.get("bm25").run(ctx, input=str(t.input), meta={"k": 20})
+                candidates = bm.output or []
             design = state.get("design") or {}
             strategy = (design.get("approach") or "").strip() if isinstance(design, dict) else None
-            out = await _implement_in_worktree(ctx, str(t.input), candidates, strategy=strategy)
+            out = await _implement_in_worktree(ctx, str(t.input), candidates, strategy=strategy, task_id=t.id)
             t.status = "done"
             return f"{t.id} done: implement\n{out}"
 
@@ -302,3 +329,42 @@ async def run_next_task(ctx) -> str:
     except Exception as e:
         t.status = "failed"
         return f"{t.id} failed: {e!r}"
+
+
+def _run_worker(
+    ctx,
+    results: List[str],
+    results_lock: asyncio.Lock,
+    progress_callback: Optional[Any] = None,
+) -> None:
+    """Single worker: repeatedly claim and run next task until queue empty (OpenCode-style parallel units of work)."""
+    async def _run() -> None:
+        while True:
+            out = await run_next_task(ctx)
+            if out == "no pending tasks":
+                break
+            async with results_lock:
+                results.append(out)
+            if progress_callback is not None and callable(progress_callback):
+                try:
+                    progress_callback(out)
+                except Exception:
+                    pass
+
+    return _run
+
+
+async def run_n_tasks(
+    ctx,
+    n: int,
+    *,
+    progress_callback: Optional[Any] = None,
+) -> List[str]:
+    """Run with n concurrent workers until queue is empty. Each worker claims and runs tasks atomically (OpenCode-style).
+    If progress_callback is set, it is called with each task output string as tasks complete (live stream, Cursor/Claude Code style)."""
+    workers = max(1, n)
+    results: List[str] = []
+    results_lock = asyncio.Lock()
+    worker_factory = _run_worker(ctx, results, results_lock, progress_callback)
+    await asyncio.gather(*[worker_factory() for _ in range(workers)])
+    return results

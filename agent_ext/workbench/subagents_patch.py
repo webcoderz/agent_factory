@@ -5,6 +5,7 @@ from pathlib import Path
 from typing import Any, Dict, List, Optional
 
 from .loop import LLM_TRACE_MAX, LLM_TRACE_PROMPT_LEN, LLM_TRACE_RESPONSE_LEN
+from .patch_models import PatchOutput, structured_to_unified_diff
 
 @dataclass
 class SubagentResult:
@@ -25,8 +26,9 @@ def _read_snippet(root: Path, rel_path: str, max_chars: int = 6000) -> str:
 
 class LLMPatchSubagent:
     """
-    Produces a unified diff. Does NOT apply it.
-    Expects ctx.model to be a pydantic-ai OpenAIChatModel (or compatible).
+    Produces a unified diff via structured output: LLM returns PatchOutput (list of
+    file edits with context/add/remove lines), we convert to valid unified diff.
+    Avoids raw diff parsing and format failures.
     """
     name = "llm_patch"
 
@@ -34,10 +36,9 @@ class LLMPatchSubagent:
         if ctx.model is None:
             return SubagentResult(ok=False, name=self.name, output="", meta={"error": "ctx.model is None"})
 
-        workdir = Path(meta.get("workdir", "."))  # may be worktree path
+        workdir = Path(meta.get("workdir", "."))
         goal = str(input)
 
-        # candidates: list of {path, score}
         candidates: List[Dict[str, Any]] = meta.get("candidates", [])[: int(meta.get("max_files", 6))]
 
         snippets = []
@@ -50,23 +51,22 @@ class LLMPatchSubagent:
         strategy = meta.get("strategy")
         strategy_block = f"\nSTRATEGY (follow this approach):\n{strategy}\n" if strategy else ""
 
-        prompt = f"""
-You are editing a git repository. Your reply must be exactly one unified diff and nothing else.
+        prompt = f"""You are editing a git repository. Return a structured patch (JSON) describing the minimal code changes.
 {strategy_block}
 GOAL:
 {goal}
 
-CRITICAL — output format:
-- Your entire response must be the raw unified diff only. No introductory sentence, no "Here is the diff", no markdown, no code fences (no ```), no explanation after.
-- Start the first line with "diff --git a/path b/path" or "--- path". Include @@ hunk headers and +/− lines. End with the last hunk line.
-- Example shape (minimal): --- a/file.py\\n+++ b/file.py\\n@@ -1,3 +1,4 @@\\n context\\n+new line\\n context
-- Keep changes minimal. For new files use --- /dev/null and +++ b/path. Prefer modifying existing code; ensure code compiles.
+RULES:
+- Only change files needed for the goal. Prefer editing existing files over creating new ones.
+- For each file: path (relative, e.g. agent_ext/foo.py), is_new_file (true only for new files), and lines: list of {{"kind": "context"|"add"|"remove", "content": "line text"}}.
+- context = unchanged line, add = new line, remove = deleted line. Order matters; keep context lines around edits so the patch is readable.
+- Keep changes minimal. Ensure code would still compile.
 
 CONTEXT SNIPPETS:
 {chr(10).join(snippets) if snippets else "(no snippets)"}
-""".strip()
 
-        # Use pydantic-ai Agent with streaming so the TUI can show response as it arrives
+Return only the structured patch: {{"files": [{{"path": "...", "is_new_file": false, "lines": [{{"kind": "context", "content": "..."}}, ...]}}, ...]}}."""
+
         traces = getattr(ctx, "llm_traces", None)
         trace_entry: Optional[Dict[str, Any]] = None
         if traces is not None:
@@ -79,30 +79,30 @@ CONTEXT SNIPPETS:
             }
             traces.append(trace_entry)
 
-        async with ctx.model_limiter:
-            from pydantic_ai import Agent
-            agent = Agent(model=ctx.model)
-            text_out = ""
-            use_stream = getattr(agent, "run_stream", None) is not None
-            if use_stream:
-                try:
-                    async with agent.run_stream(prompt) as result:
-                        async for text in result.stream_text():
-                            text_out = text
-                            if trace_entry is not None:
-                                trace_entry["response"] = (text or "")[:LLM_TRACE_RESPONSE_LEN]
-                except Exception as stream_err:
-                    use_stream = False
-                    text_out = getattr(stream_err, "output", "") or str(stream_err)
-                    if trace_entry is not None:
-                        trace_entry["response"] = (text_out or "")[:LLM_TRACE_RESPONSE_LEN]
-                    raise
-            if not use_stream or not text_out:
+        try:
+            async with ctx.model_limiter:
+                from pydantic_ai import Agent
+                agent = Agent(model=ctx.model, output_type=PatchOutput)
                 result = await agent.run(prompt)
-                text_out = getattr(result, "output", None) or str(result)
-                if trace_entry is not None:
-                    trace_entry["response"] = (text_out or "")[:LLM_TRACE_RESPONSE_LEN]
+                structured: PatchOutput = result.output
 
-        diff = (text_out or "").strip()
-        ok = diff.startswith("diff --git") or diff.startswith("--- ")
-        return SubagentResult(ok=ok, name=self.name, output=diff, meta={"files_considered": [c["path"] for c in candidates]})
+            diff = structured_to_unified_diff(structured)
+            if trace_entry is not None:
+                trace_entry["response"] = (diff or "")[:LLM_TRACE_RESPONSE_LEN]
+
+            ok = bool(diff.strip()) and ("--- " in diff or "diff --git" in diff)
+            return SubagentResult(
+                ok=ok,
+                name=self.name,
+                output=diff,
+                meta={"files_considered": [c["path"] for c in candidates], "structured": True},
+            )
+        except Exception as e:
+            if trace_entry is not None:
+                trace_entry["response"] = f"Structured output failed: {e!s}"
+            return SubagentResult(
+                ok=False,
+                name=self.name,
+                output="",
+                meta={"error": str(e), "files_considered": [c["path"] for c in candidates]},
+            )

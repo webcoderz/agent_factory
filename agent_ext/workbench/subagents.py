@@ -96,22 +96,74 @@ class RepoGrepSubagent:
         return SubagentResult(ok=True, name=self.name, output=hits, meta={"query": query, "count": len(hits)})
 
 
+def _default_plan(goal: str) -> List[Dict[str, Any]]:
+    """Fallback when no model or LLM plan fails: fixed sequence."""
+    return [
+        {"kind": "analyze", "title": "Clarify goal", "input": goal},
+        {"kind": "search", "title": "Search repo for relevant modules", "input": goal},
+        {"kind": "design", "title": "Propose approach + file changes", "input": goal},
+        {"kind": "implement", "title": "Create patch", "input": goal},
+        {"kind": "gates", "title": "Run gates/tests", "input": {"pytest": []}},
+    ]
+
+
 class PlannerSubagent:
     """
-    Cheap planner: turns a user goal into a task list.
-    Deterministic starter; later you can swap with an LLM planner.
+    Dynamic planner: when ctx.model is set, uses LLM with structured output to
+    choose task sequence (e.g. skip analyze for small edits, add multiple searches).
+    Falls back to a fixed plan when no model or validation fails.
     """
     name = "planner"
 
     async def run(self, ctx, *, input: Any, meta: Dict[str, Any]) -> SubagentResult:
         goal = str(input).strip()
-        tasks = []
+        if not goal:
+            return SubagentResult(ok=True, name=self.name, output=[], meta={"goal": goal, "count": 0})
 
-        # quick heuristic plan
-        tasks.append({"kind": "analyze", "title": "Clarify goal", "input": goal})
-        tasks.append({"kind": "search", "title": "Search repo for relevant modules", "input": goal})
-        tasks.append({"kind": "design", "title": "Propose approach + file changes", "input": goal})
-        tasks.append({"kind": "implement", "title": "Create patch", "input": goal})
-        tasks.append({"kind": "gates", "title": "Run gates/tests", "input": {"pytest": []}})
+        if getattr(ctx, "model", None) is not None:
+            try:
+                from pydantic_ai import Agent
+                from .plan_models import PlanOutput, plan_output_to_tasks
 
+                prompt = f"""Given this development goal, output a minimal ordered plan of tasks.
+
+GOAL: {goal}
+
+Available task kinds (use only these):
+- analyze: clarify the goal into a short spec (use when the goal is vague or large).
+- search: find relevant code; input = search query (can be more specific than the goal).
+- design: propose approach and which files to change (use when multiple files or non-obvious approach).
+- implement: create the code patch (always include if the goal involves code changes).
+- gates: run compile/import checks and optional tests (include at the end when code was changed).
+
+Rules:
+- Prefer fewer tasks when the goal is small (e.g. "fix typo in README" → search + implement + gates).
+- For large or vague goals start with analyze, then search, then design, then implement, then gates.
+- You may use multiple search tasks with different queries if needed.
+- Every plan that changes code should end with implement and then gates.
+- Return JSON only: {{"tasks": [{{"kind": "...", "title": "...", "input": "..."}}, ...]}}."""
+
+                async with ctx.model_limiter:
+                    agent = Agent(model=ctx.model, output_type=PlanOutput)
+                    result = await agent.run(prompt)
+                plan: PlanOutput = result.output
+                tasks = plan_output_to_tasks(plan)
+                if not tasks:
+                    tasks = _default_plan(goal)
+                return SubagentResult(
+                    ok=True,
+                    name=self.name,
+                    output=tasks,
+                    meta={"goal": goal, "count": len(tasks), "dynamic": True},
+                )
+            except Exception:
+                tasks = _default_plan(goal)
+                return SubagentResult(
+                    ok=True,
+                    name=self.name,
+                    output=tasks,
+                    meta={"goal": goal, "count": len(tasks), "dynamic": False, "fallback": True},
+                )
+
+        tasks = _default_plan(goal)
         return SubagentResult(ok=True, name=self.name, output=tasks, meta={"goal": goal, "count": len(tasks)})

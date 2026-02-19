@@ -98,6 +98,10 @@ def build_ctx(
     ctx.workbench_run_state = {}
     # Recent LLM call traces for TUI (prompt/response previews; capped at 30)
     ctx.llm_traces = []
+    # Background runs: list of asyncio.Task (many parallel runs; queue claims atomically; /stop or /stop all)
+    ctx.background_run_tasks: list = []
+    # Recent task outputs for /watch (progress_callback appends; capped in TUI)
+    ctx.watch_outputs: list = []
     # Self-improve: apply patches and run gates (optional)
     ctx.self_improve = SelfImproveController() if SelfImproveController else None
     # Workflow synthesis + learning

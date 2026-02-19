@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import asyncio
+import re
 import time
 from typing import List, Optional
 
@@ -13,7 +14,7 @@ from rich.table import Table
 from rich.text import Text
 from rich.theme import Theme
 
-from .loop import plan_and_queue, run_next_task
+from .loop import plan_and_queue, run_n_tasks, run_next_task
 
 # Slightly custom theme: keep default but ensure status colors pop
 console = Console(theme=Theme({"info": "cyan", "success": "green", "warn": "yellow", "error": "red", "dim": "dim"}))
@@ -22,7 +23,7 @@ BANNER = """
 [bold cyan]  ╭─────────────────────────────────────╮
   │  [bold white]agent_patterns[/bold white] [dim]workbench[/dim]        │
   ╰─────────────────────────────────────╯[/bold cyan]
-[dim]  plan → search → design → implement → gates[/dim]
+[dim]  Goal → plan (dynamic) → /run → task completions stream live (Cursor/Claude Code style)[/dim]
 """
 # Animated-looking rule (static; use Live elsewhere for motion)
 BANNER_RULE_STYLE = "cyan dim"
@@ -98,6 +99,29 @@ def _status_style(status: str) -> str:
     return "dim"
 
 
+def _watch_renderable(ctx, task_id: Optional[str] = None) -> Group:
+    """Build the live-updating view for /watch: recent task outputs + last LLM trace."""
+    watch_out = getattr(ctx, "watch_outputs", [])
+    lines = []
+    for out in watch_out[-25:]:
+        first = (out.split("\n")[0] or "").strip()
+        if "done" in out and "failed" not in out:
+            lines.append(f"  [green]✓[/] {first}")
+        elif "failed" in out:
+            lines.append(f"  [red]✗[/] {first}")
+        else:
+            lines.append(f"  [dim]{first}[/]")
+    task_block = "\n".join(lines) if lines else "[dim]No task output yet. Run /run to see completions here.[/]"
+    task_panel = Panel(task_block, title="[bold]Recent task output[/] [dim](streams as run progresses)[/dim]", border_style="cyan", padding=(0, 1))
+    trace_panel = _LiveTraceView(ctx, max_lines=14)
+    if task_id:
+        # Highlight that we're watching for this task
+        watching = f"[yellow]Watching for {task_id}[/] — output will appear above when it completes."
+        header = Panel(watching, title="[bold]watch[/]", border_style="yellow", padding=(0, 1))
+        return Group(header, task_panel, trace_panel)
+    return Group(task_panel, trace_panel)
+
+
 def _tasks_table(ctx) -> Table:
     t = Table(title="[bold]Task Queue[/bold]", title_style="bold white", border_style="dim")
     t.add_column("id", style="bold cyan")
@@ -114,10 +138,20 @@ def _tasks_table(ctx) -> Table:
     return t
 
 
-def _format_llm_trace(entry: dict) -> str:
+# Max chars per trace when listing (avoid hanging on /traces with huge prompts/responses)
+TRACE_PREVIEW_PROMPT = 800
+TRACE_PREVIEW_RESPONSE = 1200
+
+
+def _format_llm_trace(entry: dict, truncate: bool = True) -> str:
     kind = entry.get("kind", "?")
-    prompt = entry.get("prompt", "")
-    response = entry.get("response", "")
+    prompt = entry.get("prompt", "") or ""
+    response = entry.get("response", "") or ""
+    if truncate:
+        if len(prompt) > TRACE_PREVIEW_PROMPT:
+            prompt = prompt[:TRACE_PREVIEW_PROMPT] + "\n… [truncated]"
+        if len(response) > TRACE_PREVIEW_RESPONSE:
+            response = response[:TRACE_PREVIEW_RESPONSE] + "\n… [truncated]"
     return f"[bold magenta]{kind}[/]\n[dim]prompt:[/]\n{prompt}\n[dim]response:[/]\n{response}"
 
 
@@ -153,14 +187,17 @@ async def run_tui(ctx) -> None:
                     "[cyan]/status[/]   case/session",
                     "[cyan]/agents[/]   list subagents",
                     "[cyan]/tasks[/]    task queue",
-                    "[cyan]/plan <goal>[/]  queue plan",
-                    "[cyan]/run[/] [dim]or[/] [cyan]/run N[/]  run next task(s)",
+                    "[cyan]/plan <goal>[/]  queue plan (background)",
+                    "[cyan]/run[/] [dim]or[/] [cyan]/run N[/]  run in background  [cyan]/run N fg[/]  wait & watch",
                     "[cyan]/parallel <n>[/]  max subagents",
                     "[cyan]/model[/]   model info",
                     "[cyan]/workflows[/]  list",
                     "[cyan]/assemble[/] [cyan]/exec[/]  workflow",
                     "[cyan]/adopt[/]   apply last patch",
                     "[cyan]/traces[/] [dim][N][/]  last LLM prompt/response",
+                    "[cyan]/watch[/] [dim][task_id][/]  live view of run + trace (Enter to leave)",
+                    "[cyan]/ask <q>[/]  one-off question (background)",
+                    "[cyan]/stop[/]   cancel background run",
                     "[cyan]/quit[/]    exit",
                 ]),
                 title="[bold]commands[/bold]",
@@ -169,11 +206,51 @@ async def run_tui(ctx) -> None:
             continue
 
         if msg == "/status":
+            tasks_list = getattr(ctx, "background_run_tasks", [])
+            active = [t for t in tasks_list if not t.done()]
+            done_q = sum(1 for t in ctx.task_queue.list() if t.status == "done")
+            pending_q = sum(1 for t in ctx.task_queue.list() if t.status == "pending")
+            bg_line = ""
+            if active:
+                bg_line = f"\n[yellow]{len(active)} run(s) in progress[/] [dim](queue: {done_q} done, {pending_q} pending — /stop or /stop all)[/]"
+            else:
+                bg_line = f"\n[dim]queue: {done_q} done, {pending_q} pending[/]"
             console.print(Panel(
-                f"[bold]case[/]={ctx.case_id}  [bold]session[/]={ctx.session_id}  [bold]user[/]={ctx.user_id}",
+                f"[bold]case[/]={ctx.case_id}  [bold]session[/]={ctx.session_id}  [bold]user[/]={ctx.user_id}{bg_line}",
                 title="[bold]status[/bold]",
                 border_style="dim",
             ))
+            continue
+
+        if msg.startswith("/stop"):
+            tasks_list = getattr(ctx, "background_run_tasks", [])
+            active = [t for t in tasks_list if not t.done()]
+            if not active:
+                console.print(Panel("[dim]No background runs in progress.[/]", title="stop", border_style="dim"))
+                continue
+            stop_all = msg.strip().lower().endswith("all")
+            if stop_all:
+                for t in active:
+                    t.cancel()
+                for t in active:
+                    try:
+                        await t
+                    except asyncio.CancelledError:
+                        pass
+                ctx.background_run_tasks.clear()
+                console.print(Panel(f"[yellow]Stopped {len(active)} run(s).[/]", title="stop", border_style="yellow"))
+            else:
+                t = active[-1]
+                t.cancel()
+                try:
+                    await t
+                except asyncio.CancelledError:
+                    pass
+                try:
+                    ctx.background_run_tasks.remove(t)
+                except ValueError:
+                    pass
+                console.print(Panel("[yellow]Most recent run stopped.[/]", title="stop", border_style="yellow"))
             continue
 
         if msg == "/agents":
@@ -214,17 +291,44 @@ async def run_tui(ctx) -> None:
             console.print("[dim]  ───[/dim]")
             continue
 
+        if msg == "/watch" or msg.startswith("/watch "):
+            task_id = msg.split(maxsplit=1)[1].strip() if msg.startswith("/watch ") else None
+            if task_id and not task_id.startswith("t"):
+                task_id = f"t{task_id}" if task_id.isdigit() else task_id
+            initial = _watch_renderable(ctx, task_id)
+            with Live(initial, refresh_per_second=4, console=console) as live:
+
+                async def _watch_update_loop() -> None:
+                    while True:
+                        live.update(_watch_renderable(ctx, task_id))
+                        await asyncio.sleep(0.25)
+
+                update_task = asyncio.create_task(_watch_update_loop())
+                try:
+                    await _ainput("\n[dim]Press Enter to close watch...[/] ")
+                finally:
+                    update_task.cancel()
+                    try:
+                        await update_task
+                    except asyncio.CancelledError:
+                        pass
+            continue
+
         if msg == "/traces" or msg.startswith("/traces "):
             traces = getattr(ctx, "llm_traces", [])
             n = 5
-            if msg.startswith("/traces ") and msg.split(maxsplit=1)[1].strip().isdigit():
-                n = max(1, int(msg.split(maxsplit=1)[1].strip()))
+            parts = msg.split(maxsplit=1)
+            if len(parts) >= 2 and parts[1].strip().isdigit():
+                n = max(1, min(30, int(parts[1].strip())))
             show = traces[-n:] if traces else []
             if not show:
                 console.print(Panel("[dim]No LLM traces yet. Run /run (analyze, design, or implement) to generate.[/]", title="[bold]traces[/bold]", border_style="dim"))
             else:
                 for i, entry in enumerate(reversed(show)):
-                    console.print(Panel(_format_llm_trace(entry), title=f"[bold]trace[/] {len(show) - i} ([magenta]{entry.get('kind', '?')}[/])", border_style="dim", padding=(0, 1)))
+                    body = _format_llm_trace(entry, truncate=True)
+                    console.print(Panel(body, title=f"[bold]trace[/] {len(show) - i} ([magenta]{entry.get('kind', '?')}[/]) [dim]preview[/dim]", border_style="dim", padding=(0, 1)))
+                if n > 1 or any(len((e.get("prompt") or "") + (e.get("response") or "")) > TRACE_PREVIEW_PROMPT + TRACE_PREVIEW_RESPONSE for e in show):
+                    console.print("[dim]Previews only; full content in ctx.llm_traces[/]")
             continue
 
         if msg.startswith("/parallel "):
@@ -244,27 +348,145 @@ async def run_tui(ctx) -> None:
 
         if msg.startswith("/plan "):
             goal = msg.split(" ", 1)[1].strip()
-            plan_message: List[str] = [f"[dim]Planning: {goal[:50]}{'…' if len(goal) > 50 else ''}[/]"]
-            plan_spinner = Panel(
-                _LiveSpinner(plan_message, spinner_name="dots", style="bold green"),
-                title="[bold green] plan [/]",
-                border_style="green",
-                padding=(0, 1),
-            )
-            with Live(plan_spinner, refresh_per_second=LIVE_REFRESH_PER_SECOND, console=console):
-                lines = await plan_and_queue(ctx, goal)
-            console.print(Panel("\n".join(lines), title="[bold]plan[/bold]", border_style="green"))
+            if not goal:
+                console.print(Panel("usage: /plan <goal>", title="plan", border_style="dim"))
+                continue
+
+            def _on_plan_done_slash(t: asyncio.Task) -> None:
+                try:
+                    if t.cancelled():
+                        return
+                    exc = t.exception()
+                    if exc is not None:
+                        console.print(Panel(f"[red]Plan failed: {exc}[/]", title="plan", border_style="red"))
+                        return
+                    lines = t.result()
+                    console.print(Panel("\n".join(lines) if lines else "[dim]No tasks.[/]", title="plan", border_style="green"))
+                except Exception as e:
+                    console.print(Panel(f"[red]{e}[/]", title="plan", border_style="red"))
+
+            asyncio.create_task(plan_and_queue(ctx, goal)).add_done_callback(_on_plan_done_slash)
+            console.print(Panel(f"[dim]Planning in background:[/] {goal[:80]}{'…' if len(goal) > 80 else ''}\n[dim]/tasks when ready, then /run.[/]", title="plan", border_style="green"))
+            continue
+
+        if msg.startswith("/ask "):
+            question = msg.split(" ", 1)[1].strip()
+            if not question:
+                console.print(Panel("usage: /ask <question>", title="ask", border_style="dim"))
+                continue
+            if not ctx.model:
+                console.print(Panel("[red]No model set. Use --use-openai-chat-model.[/]", title="ask", border_style="red"))
+                continue
+
+            async def _ask_background(q: str) -> None:
+                try:
+                    from pydantic_ai import Agent
+                    async with ctx.model_limiter:
+                        agent = Agent(model=ctx.model)
+                        result = await agent.run(q)
+                    out = getattr(result, "output", None) or str(result)
+                    console.print(Panel(f"[dim]Q:[/] {q[:120]}{'…' if len(q) > 120 else ''}\n\n[green]{out}[/]", title="ask", border_style="cyan"))
+                except asyncio.CancelledError:
+                    console.print(Panel("[yellow]Ask cancelled.[/]", title="ask", border_style="yellow"))
+                except Exception as e:
+                    console.print(Panel(f"[red]{e}[/]", title="ask", border_style="red"))
+
+            asyncio.create_task(_ask_background(question))
+            console.print(Panel(f"[dim]Asking in background.[/] Answer will appear when ready. Keep typing — /tasks, /run, etc.[/]", title="ask", border_style="cyan"))
             continue
 
         if msg.startswith("/run"):
             parts = msg.split()
             count = 1
-            if len(parts) == 2:
-                try:
-                    count = int(parts[1])
-                except Exception:
-                    count = 1
+            # Default: run in background so TUI stays responsive; use fg/wait to block and watch
+            background = True
+            if len(parts) >= 2:
+                if parts[-1] in ("fg", "wait", "foreground"):
+                    background = False
+                    parts = parts[:-1]
+                elif parts[-1] in ("&", "bg"):
+                    parts = parts[:-1]
+                if parts and len(parts) >= 2:
+                    try:
+                        count = max(1, int(parts[1]))
+                    except Exception:
+                        count = 1
 
+            if background:
+                # Non-blocking: run in background; stream task completions live (Cursor/Claude Code style)
+                tasks_list = getattr(ctx, "background_run_tasks", [])
+
+                def _on_task_complete(out: str) -> None:
+                    first = (out.split("\n")[0] or "").strip()
+                    if "done" in out and "failed" not in out:
+                        console.print(f"  [green]✓[/] [dim]{first}[/]")
+                    elif "failed" in out:
+                        console.print(f"  [red]✗[/] [dim]{first}[/]")
+                    watch_out = getattr(ctx, "watch_outputs", None)
+                    if watch_out is not None:
+                        watch_out.append(out)
+                        if len(watch_out) > 100:
+                            watch_out.pop(0)
+
+                def _on_background_done(t: asyncio.Task) -> None:
+                    try:
+                        ctx.background_run_tasks.remove(t)
+                    except ValueError:
+                        pass
+                    if t.cancelled():
+                        console.print(Panel("[yellow]Background run stopped.[/]", title="run", border_style="yellow"))
+                        return
+                    exc = t.exception()
+                    if exc is not None:
+                        console.print(Panel(f"[red]Background run error: {exc}[/]", title="run", border_style="red"))
+                        return
+                    outs = t.result()
+                    if not outs:
+                        console.print(Panel("[dim]No tasks run (queue empty).[/]", title="run", border_style="dim"))
+                        return
+                    n_done = sum(1 for o in outs if "done" in o and "failed" not in o)
+                    failed_outs = [o for o in outs if "failed" in o]
+                    n_fail = len(failed_outs)
+                    body = f"[green]Background run finished.[/] {n_done} done, {n_fail} failed."
+                    if failed_outs:
+                        body += "\n\n[red]Failed task(s):[/]"
+                        for o in failed_outs:
+                            lines = o.strip().split("\n")
+                            # For implement/patch failures show more context (reason + model snippet)
+                            if "create patch failed" in o or "implement:" in o and "failed" in o:
+                                excerpt = "\n    ".join(lines[:8]) if len(lines) > 1 else lines[0]
+                                if len(excerpt) > 700:
+                                    excerpt = excerpt[:697] + "..."
+                                body += f"\n  [red]•[/] {excerpt}"
+                            else:
+                                first_line = (lines[0] or "").strip()
+                                if len(first_line) > 120:
+                                    first_line = first_line[:117] + "..."
+                                body += f"\n  [red]•[/] {first_line}"
+                        body += "\n\n[dim]Use /tasks and /traces for full details.[/]"
+                    else:
+                        body += "\n[dim]Use /tasks and /traces to inspect.[/]"
+                    if n_fail == 0 and outs:
+                        for o in outs:
+                            if "diff_saved=" in o:
+                                m = re.search(r"diff_saved=(\S+)", o)
+                                if m:
+                                    body += f"\n[cyan]Patch:[/] [dim]{m.group(1)}[/] [dim](/adopt to apply)[/]"
+                                    break
+                    console.print(Panel(body, title="run", border_style="green" if n_fail == 0 else "red"))
+
+                task = asyncio.create_task(run_n_tasks(ctx, count, progress_callback=_on_task_complete))
+                task.add_done_callback(_on_background_done)
+                ctx.background_run_tasks.append(task)
+                n_active = len([x for x in ctx.background_run_tasks if not x.done()])
+                console.print(Panel(
+                    f"[green]Run started[/] ({count} worker(s)) — task completions will stream below. [cyan]/status[/] [cyan]/traces[/] [cyan]/stop[/]",
+                    title="run",
+                    border_style="green",
+                ))
+                continue
+
+            # Foreground (blocking): show Live spinner + trace
             outs: List[str] = []
             run_message: List[str] = ["Starting…"]
             run_spinner_panel = Panel(
@@ -358,14 +580,36 @@ async def run_tui(ctx) -> None:
 
 
 
-        # Plain chat message = treat as goal (fast UX)
-        plan_message_plain: List[str] = [msg[:60] + ("…" if len(msg) > 60 else "")]
-        plan_spinner_plain = Panel(
-            _LiveSpinner(plan_message_plain, spinner_name="arc", style="bold cyan", use_markup=False),
-            title="[bold cyan] plan [/]",
+        # Plain chat message = queue plan in background (never block TUI; OpenCode/Claude Code style)
+        goal = msg.strip()[:200]
+        if not goal:
+            continue
+
+        def _on_plan_done(t: asyncio.Task) -> None:
+            try:
+                if t.cancelled():
+                    return
+                exc = t.exception()
+                if exc is not None:
+                    console.print(Panel(f"[red]Plan failed: {exc}[/]", title="plan", border_style="red"))
+                    return
+                lines = t.result()
+                if lines and "planner failed" not in (lines[0] or ""):
+                    console.print(Panel(
+                        "[green]Plan done.[/] " + "\n".join(lines)[:500] + ("\n…" if len("\n".join(lines)) > 500 else "") + "\n[dim]Use /run to start, or /plan <goal> for another.[/]",
+                        title="plan",
+                        border_style="green",
+                    ))
+                else:
+                    console.print(Panel("\n".join(lines) if lines else "[dim]No tasks.[/]", title="plan", border_style="yellow"))
+            except Exception as e:
+                console.print(Panel(f"[red]{e}[/]", title="plan", border_style="red"))
+
+        plan_task = asyncio.create_task(plan_and_queue(ctx, goal))
+        plan_task.add_done_callback(_on_plan_done)
+        console.print(Panel(
+            f"[dim]Planning in background:[/] {goal}\n[dim]Keep typing — [/][cyan]/tasks[/] [dim]when ready, then [/][cyan]/run[/] [dim]. Run continues in parallel.[/]",
+            title="plan",
             border_style="cyan",
-            padding=(0, 1),
-        )
-        with Live(plan_spinner_plain, refresh_per_second=LIVE_REFRESH_PER_SECOND, console=console):
-            lines = await plan_and_queue(ctx, msg)
-        console.print(Panel("\n".join(lines), title="plan"))
+        ))
+        continue

@@ -37,9 +37,9 @@
       "skipped": false
     },
     "WORKBENCH.md": {
-      "sha256": "f3c6a07253b1de7f3455df8044e199c93a8477a23ab619900dc2690d93a8c427",
-      "size": 888,
-      "mtime": 1771457742.2638936,
+      "sha256": "d874fc2a370494e7e79a64a9d2af6b77beabfc2450f3a9196fdb9d893c9fa970",
+      "size": 2330,
+      "mtime": 1771467463.7627554,
       "lang": "markdown",
       "skipped": false
     },
@@ -632,9 +632,9 @@
       "skipped": false
     },
     "agent_ext/self_improve/patching.py": {
-      "sha256": "70437eaa99d86385811508fbd51102f76409ef101d5b64935d80570873910707",
-      "size": 3995,
-      "mtime": 1771460464.234103,
+      "sha256": "660dad5426c0d2f184dc917785791bda43ead48917cbdb71952435dccb2aefb8",
+      "size": 8544,
+      "mtime": 1771466864.9211779,
       "lang": "python",
       "skipped": false
     },
@@ -807,9 +807,9 @@
       "skipped": false
     },
     "agent_ext/workbench/loop.py": {
-      "sha256": "7c909d8ac86ec0a40193d0214dd949286618199d310182703be4ce52d56e481f",
-      "size": 12693,
-      "mtime": 1771460743.819551,
+      "sha256": "1019cd39080c16183cd53d33e097ec5e764fc9d3bddfd3afff3fa601b57e93e4",
+      "size": 15827,
+      "mtime": 1771466818.0292296,
       "lang": "python",
       "skipped": false
     },
@@ -828,23 +828,23 @@
       "skipped": false
     },
     "agent_ext/workbench/planner.py": {
-      "sha256": "9bb4a068e44db16bb9d5b0ad6b49da5320fb23f7a54e5f7740a23815907daeb3",
-      "size": 1014,
-      "mtime": 1771443943.875985,
+      "sha256": "de88627d8aadccfb926811d7292134f7befde8dd37841ed65dbbaeba7d560ffe",
+      "size": 1652,
+      "mtime": 1771465946.5834105,
       "lang": "python",
       "skipped": false
     },
     "agent_ext/workbench/runtime.py": {
-      "sha256": "dba5c03638f144ae8adfc518704a1054e80c8566f4318897cacf66c82d1da536",
-      "size": 5085,
-      "mtime": 1771459935.34057,
+      "sha256": "d0a11abcdccea422e317480dbdf76802206d1b29d3c59a0c7224e71e6ca9cdeb",
+      "size": 5237,
+      "mtime": 1771465974.826999,
       "lang": "python",
       "skipped": false
     },
     "agent_ext/workbench/subagents.py": {
-      "sha256": "bb1841665baf2e46751c71303e5835864907ce9d69731218361f76b505f4386f",
-      "size": 3725,
-      "mtime": 1771443926.3181622,
+      "sha256": "d9a8f15901bbd571c4c6a1866a2ef1d8f6db3d35521e5bd2960782dfea2d5fae",
+      "size": 6244,
+      "mtime": 1771467447.6593938,
       "lang": "python",
       "skipped": false
     },
@@ -856,9 +856,9 @@
       "skipped": false
     },
     "agent_ext/workbench/tui_async.py": {
-      "sha256": "ab727a0cccc9ff4dbbb6f89a7349ae610c3f54894b1a7f0e10832f7336a77ac0",
-      "size": 15627,
-      "mtime": 1771460784.5749035,
+      "sha256": "bcfb925be8562ca8b0caa66d88fb1eddc80b9157647d1e40403d8c77a4d3874b",
+      "size": 25212,
+      "mtime": 1771466539.0078597,
       "lang": "python",
       "skipped": false
     },
@@ -996,9 +996,9 @@
       "skipped": false
     },
     "agent_ext/workbench/subagents_patch.py": {
-      "sha256": "8923bb7c6a653505d612642c81c45faa1374e64ef4d1ab905413d7c53aa7580a",
-      "size": 3543,
-      "mtime": 1771460765.946621,
+      "sha256": "34a23c984ec444a6aec05b18e1ffd430c43fd53b0d5b68a55430c89e47878369",
+      "size": 4247,
+      "mtime": 1771467097.9579966,
       "lang": "python",
       "skipped": false
     },
@@ -1076,6 +1076,27 @@
       "sha256": "779014f9f4008268fef29a0af8bea3c89f7dc410975dfe73a01324eec7bc4e89",
       "size": 2498,
       "mtime": 1771458669.7496405,
+      "lang": "python",
+      "skipped": false
+    },
+    "agent_ext/workbench/streaming.py": {
+      "sha256": "381cba4b4af31b4f235975052f2f05b3a75ec309f637eb7b585e0da9e8406004",
+      "size": 3452,
+      "mtime": 1771461150.8032632,
+      "lang": "python",
+      "skipped": false
+    },
+    "agent_ext/workbench/patch_models.py": {
+      "sha256": "d93bc246be0ba3028c19f25d97769d2b7d1d497d841921e42bc169bc6f036b65",
+      "size": 2622,
+      "mtime": 1771467085.7515574,
+      "lang": "python",
+      "skipped": false
+    },
+    "agent_ext/workbench/plan_models.py": {
+      "sha256": "c019563cfa02e01234e5a86a07e6f221b56bac4765d0abc9c8a978c8e5f1592d",
+      "size": 1438,
+      "mtime": 1771467399.7249153,
       "lang": "python",
       "skipped": false
     }
