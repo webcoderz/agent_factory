@@ -19,14 +19,35 @@ from .loop import plan_and_queue, run_n_tasks, run_next_task
 # Slightly custom theme: keep default but ensure status colors pop
 console = Console(theme=Theme({"info": "cyan", "success": "green", "warn": "yellow", "error": "red", "dim": "dim"}))
 
-BANNER = """
-[bold cyan]  ╭─────────────────────────────────────╮
+BANNER = """[bold cyan]  ╭─────────────────────────────────────╮
   │  [bold white]agent_patterns[/bold white] [dim]workbench[/dim]        │
   ╰─────────────────────────────────────╯[/bold cyan]
-[dim]  Goal → plan (dynamic) → /run → task completions stream live (Cursor/Claude Code style)[/dim]
+  [dim]Quick start:[/]
+    [cyan]•[/] Type a goal or [bold]/plan <goal>[/] to plan
+    [cyan]•[/] [bold]/run[/] to execute  ·  [bold]/watch[/] for live view
+    [cyan]•[/] [bold]/tasks[/] to see queue  ·  [bold]/help[/] for all commands
 """
 # Animated-looking rule (static; use Live elsewhere for motion)
 BANNER_RULE_STYLE = "cyan dim"
+
+# Kind-specific icons for task display
+KIND_ICON = {
+    "analyze": "🧠",
+    "search": "🔍",
+    "design": "📐",
+    "implement": "🔨",
+    "gates": "🧪",
+    "improve": "✨",
+}
+
+KIND_STYLE = {
+    "analyze": "bright_blue",
+    "search": "yellow",
+    "design": "magenta",
+    "implement": "green",
+    "gates": "cyan",
+    "improve": "bright_magenta",
+}
 
 # Spinner names: dots, dots12, line, aesthetic, runner, arc, etc. Run: python -m rich.spinner
 RUN_SPINNER = "dots12"
@@ -124,17 +145,34 @@ def _watch_renderable(ctx, task_id: Optional[str] = None) -> Group:
     return Group(task_panel, trace_panel)
 
 
+def _format_elapsed(elapsed_s: float | None) -> str:
+    """Format elapsed seconds into human-readable string."""
+    if elapsed_s is None:
+        return "[dim]—[/]"
+    if elapsed_s < 1.0:
+        return f"[dim]{elapsed_s*1000:.0f}ms[/]"
+    if elapsed_s < 60:
+        return f"[dim]{elapsed_s:.1f}s[/]"
+    mins = int(elapsed_s // 60)
+    secs = int(elapsed_s % 60)
+    return f"[dim]{mins}m{secs:02d}s[/]"
+
+
 def _tasks_table(ctx) -> Table:
     t = Table(title="[bold]Task Queue[/bold]", title_style="bold white", border_style="dim")
-    t.add_column("id", style="bold cyan")
-    t.add_column("kind", style="magenta")
-    t.add_column("status", style=None)
+    t.add_column("id", style="bold cyan", no_wrap=True)
+    t.add_column("kind", style=None, no_wrap=True)
+    t.add_column("status", style=None, no_wrap=True)
+    t.add_column("time", style=None, no_wrap=True, justify="right")
     t.add_column("title", style="white")
     for task in ctx.task_queue.list():
+        icon = KIND_ICON.get(task.kind, "·")
+        kstyle = KIND_STYLE.get(task.kind, "magenta")
         t.add_row(
             task.id,
-            task.kind,
+            f"{icon} [{kstyle}]{task.kind}[/]",
             f"[{_status_style(task.status)}]{task.status}[/]",
+            _format_elapsed(task.elapsed_s),
             task.title,
         )
     return t
@@ -185,24 +223,32 @@ async def run_tui(ctx) -> None:
         if msg == "/help":
             console.print(Panel(
                 "\n".join([
-                    "[cyan]/help[/]     this",
-                    "[cyan]/status[/]   case/session",
-                    "[cyan]/agents[/]   list subagents",
-                    "[cyan]/tasks[/]    task queue",
-                    "[cyan]/plan <goal>[/]  queue plan (background)",
-                    "[cyan]/run[/] [dim]or[/] [cyan]/run N[/]  run in background  [cyan]/run N fg[/]  wait & watch",
-                    "[cyan]/parallel <n>[/]  max subagents",
-                    "[cyan]/model[/]   model info",
-                    "[cyan]/workflows[/]  list",
-                    "[cyan]/assemble[/] [cyan]/exec[/]  workflow",
-                    "[cyan]/adopt[/]   apply last patch",
-                    "[cyan]/trace[/]  [dim]last trace FULL (for debugging)[/]",
-                    "[cyan]/traces[/] [dim][N][/]  last N traces (preview)",
-                    "[cyan]/watch[/] [dim][task_id][/]  live view of run + trace (Enter to leave)",
-                    "[cyan]/ask <q>[/]  one-off question (background)",
-                    "[cyan]/stop[/]   cancel background run",
-                    "[cyan]/cancel <id>[/]  cancel pending task by id (e.g. t0004)",
-                    "[cyan]/quit[/]    exit",
+                    "[bold white]Planning & Execution[/]",
+                    "  [cyan]/plan <goal>[/]    queue plan (background)",
+                    "  [cyan]/run[/] [dim]or[/] [cyan]/run N[/]    run in background  [cyan]/run N fg[/]  wait & watch",
+                    "  [cyan]/stop[/] [dim]or[/] [cyan]/stop all[/]  cancel run(s)",
+                    "",
+                    "[bold white]Inspection[/]",
+                    "  [cyan]/tasks[/]          task queue with timing",
+                    "  [cyan]/status[/]         case/session + run info",
+                    "  [cyan]/agents[/]         list subagents",
+                    "  [cyan]/watch[/] [dim][id][/]      live view of run + trace",
+                    "  [cyan]/diff[/]           show last generated patch",
+                    "  [cyan]/trace[/]          last LLM trace (full)",
+                    "  [cyan]/traces[/] [dim][N][/]      last N traces (preview)",
+                    "",
+                    "[bold white]Actions[/]",
+                    "  [cyan]/adopt[/]          apply last patch to repo",
+                    "  [cyan]/retry[/] [dim][id][/]      retry failed task(s)",
+                    "  [cyan]/cancel <id>[/]    cancel pending task",
+                    "  [cyan]/ask <q>[/]        one-off LLM question",
+                    "",
+                    "[bold white]Config & Misc[/]",
+                    "  [cyan]/parallel <n>[/]   max subagents",
+                    "  [cyan]/model[/]          model info",
+                    "  [cyan]/workflows[/]      list workflows",
+                    "  [cyan]/clear[/]          clear screen",
+                    "  [cyan]/quit[/]           exit",
                 ]),
                 title="[bold]commands[/bold]",
                 border_style="cyan",
@@ -311,6 +357,55 @@ async def run_tui(ctx) -> None:
                 console.print(Panel(f"[red]No task with id '{task_id}'.[/] Use [cyan]/tasks[/] for ids.", title="cancel", border_style="red"))
             continue
 
+        if msg == "/clear":
+            console.clear()
+            console.print(BANNER)
+            console.print(Rule(style=BANNER_RULE_STYLE))
+            continue
+
+        if msg == "/diff":
+            from pathlib import Path as _DiffPath
+            from rich.syntax import Syntax
+            state_dir = _DiffPath(".agent_state")
+            path_file = state_dir / "last_patch_path.txt"
+            diff_path = None
+            if path_file.exists():
+                diff_path = _DiffPath(path_file.read_text(encoding="utf-8").strip())
+            if diff_path is None or not diff_path.exists():
+                console.print(Panel(
+                    "[dim]No saved patch yet. Run [cyan]/run[/] to generate one.[/]",
+                    title="diff", border_style="dim",
+                ))
+                continue
+            diff_content = diff_path.read_text(encoding="utf-8")
+            if not diff_content.strip():
+                console.print(Panel("[dim]Patch file is empty.[/]", title="diff", border_style="dim"))
+                continue
+            syntax = Syntax(diff_content, "diff", theme="monokai", line_numbers=True, word_wrap=True)
+            console.print(Panel(syntax, title=f"[bold]Last patch[/] [dim]({diff_path})[/]", border_style="green", padding=(0, 1)))
+            continue
+
+        if msg == "/retry" or msg.startswith("/retry "):
+            parts = msg.split(maxsplit=1)
+            if len(parts) >= 2 and parts[1].strip():
+                task_id = parts[1].strip()
+                result = await ctx.task_queue.retry_by_id(task_id)
+                if result is True:
+                    console.print(Panel(f"[green]Task reset to pending.[/] Use [cyan]/run[/] to execute.", title="retry", border_style="green"))
+                elif result is False:
+                    t = ctx.task_queue.get_by_id(task_id)
+                    status = t.status if t else "?"
+                    console.print(Panel(f"[yellow]Task not retryable (status: {status}).[/] Only failed/cancelled tasks can be retried.", title="retry", border_style="yellow"))
+                else:
+                    console.print(Panel(f"[red]No task with id '{task_id}'.[/]", title="retry", border_style="red"))
+            else:
+                count = await ctx.task_queue.retry_all_failed()
+                if count > 0:
+                    console.print(Panel(f"[green]Reset {count} failed task(s) to pending.[/] Use [cyan]/run[/] to execute.", title="retry", border_style="green"))
+                else:
+                    console.print(Panel("[dim]No failed tasks to retry.[/]", title="retry", border_style="dim"))
+            continue
+
         if msg == "/watch" or msg.startswith("/watch "):
             task_id = msg.split(maxsplit=1)[1].strip() if msg.startswith("/watch ") else None
             if task_id and not task_id.startswith("t"):
@@ -399,7 +494,11 @@ async def run_tui(ctx) -> None:
                         console.print(Panel(f"[red]Plan failed: {exc}[/]", title="plan", border_style="red"))
                         return
                     lines = t.result()
-                    console.print(Panel("\n".join(lines) if lines else "[dim]No tasks.[/]", title="plan", border_style="green"))
+                    if lines and "planner failed" not in (lines[0] or ""):
+                        console.print(_tasks_table(ctx))
+                        console.print(Panel("[green]Plan ready.[/] Use [cyan]/run[/] to start.", title="plan", border_style="green"))
+                    else:
+                        console.print(Panel("\n".join(lines) if lines else "[dim]No tasks.[/]", title="plan", border_style="yellow"))
                 except Exception as e:
                     console.print(Panel(f"[red]{e}[/]", title="plan", border_style="red"))
 
@@ -633,8 +732,9 @@ async def run_tui(ctx) -> None:
                     return
                 lines = t.result()
                 if lines and "planner failed" not in (lines[0] or ""):
+                    console.print(_tasks_table(ctx))
                     console.print(Panel(
-                        "[green]Plan done.[/] " + "\n".join(lines)[:500] + ("\n…" if len("\n".join(lines)) > 500 else "") + "\n[dim]Use /run to start, or /plan <goal> for another.[/]",
+                        "[green]Plan ready.[/] Use [cyan]/run[/] to start, or [cyan]/plan <goal>[/] for another.",
                         title="plan",
                         border_style="green",
                     ))

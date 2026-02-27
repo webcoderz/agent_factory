@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import asyncio
+import time
 from dataclasses import dataclass, field
 from typing import Any, Dict, List, Optional
 
@@ -13,6 +14,17 @@ class Task:
     input: Any
     status: str = "pending"  # pending/in_progress/done/failed/cancelled
     meta: Dict[str, Any] = field(default_factory=dict)
+    created_at: float = field(default_factory=time.time)
+    started_at: float | None = None
+    finished_at: float | None = None
+
+    @property
+    def elapsed_s(self) -> float | None:
+        """Seconds between start and finish (or now if in progress)."""
+        if self.started_at is None:
+            return None
+        end = self.finished_at if self.finished_at is not None else time.time()
+        return end - self.started_at
 
 
 class TaskQueue:
@@ -45,6 +57,7 @@ class TaskQueue:
             for t in self._tasks:
                 if t.status == "pending":
                     t.status = "in_progress"
+                    t.started_at = time.time()
                     return t
             return None
 
@@ -68,6 +81,33 @@ class TaskQueue:
                 if t.id == tid:
                     if t.status == "pending":
                         t.status = "cancelled"
+                        t.finished_at = time.time()
                         return True
                     return False
             return None
+
+    async def retry_by_id(self, task_id: str) -> Optional[bool]:
+        """Reset a failed/cancelled task to pending. Returns True if reset, False if not in retryable state, None if not found."""
+        tid = self.normalize_id(task_id)
+        async with self._lock:
+            for t in self._tasks:
+                if t.id == tid:
+                    if t.status in ("failed", "cancelled"):
+                        t.status = "pending"
+                        t.started_at = None
+                        t.finished_at = None
+                        return True
+                    return False
+            return None
+
+    async def retry_all_failed(self) -> int:
+        """Reset all failed tasks to pending. Returns count."""
+        count = 0
+        async with self._lock:
+            for t in self._tasks:
+                if t.status == "failed":
+                    t.status = "pending"
+                    t.started_at = None
+                    t.finished_at = None
+                    count += 1
+        return count

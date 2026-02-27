@@ -81,3 +81,45 @@ class TestTaskQueue:
         q = TaskQueue()
         assert q.normalize_id("0001") == "t0001"
         assert q.normalize_id("t0001") == "t0001"
+
+    @pytest.mark.asyncio
+    async def test_retry_failed_task(self):
+        q = TaskQueue()
+        t = q.add("implement", "Create patch", "goal")
+        await q.claim_next_pending()  # in_progress
+        t.status = "failed"
+        result = await q.retry_by_id(t.id)
+        assert result is True
+        assert t.status == "pending"
+        assert t.started_at is None
+        assert t.finished_at is None
+
+    @pytest.mark.asyncio
+    async def test_retry_non_failed_task(self):
+        q = TaskQueue()
+        t = q.add("search", "A", "q1")
+        result = await q.retry_by_id(t.id)
+        assert result is False  # pending, not retryable
+
+    @pytest.mark.asyncio
+    async def test_retry_all_failed(self):
+        q = TaskQueue()
+        t1 = q.add("search", "A", "q1")
+        t2 = q.add("implement", "B", "q2")
+        t1.status = "failed"
+        t2.status = "failed"
+        count = await q.retry_all_failed()
+        assert count == 2
+        assert t1.status == "pending"
+        assert t2.status == "pending"
+
+    def test_elapsed_time(self):
+        import time
+        q = TaskQueue()
+        t = q.add("search", "A", "q1")
+        assert t.elapsed_s is None  # not started
+        t.started_at = time.time() - 5.0
+        assert t.elapsed_s is not None
+        assert t.elapsed_s >= 4.9  # at least ~5s
+        t.finished_at = t.started_at + 5.0
+        assert abs(t.elapsed_s - 5.0) < 0.1

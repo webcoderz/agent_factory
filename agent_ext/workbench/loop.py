@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import asyncio
 import json
+import time
 from pathlib import Path
 from typing import Any, Dict, List, Optional
 import os
@@ -219,6 +220,7 @@ async def run_next_task(ctx) -> str:
             if state is not None:
                 state["search_bm25_hits"] = bm.output
             t.status = "done"
+            t.finished_at = time.time()
             return f"{t.id} done: search\n- bm25: {len(bm.output)} hits\n  top: " + ", ".join([x["path"] for x in bm.output[:5]])
 
 
@@ -239,8 +241,10 @@ async def run_next_task(ctx) -> str:
                 if hasattr(ctx, "workbench_run_state"):
                     ctx.workbench_run_state.update(state)
                 t.status = "done"
+                t.finished_at = time.time()
                 return f"{t.id} done: analyze\n{spec[:400]}..."
             t.status = "done"
+            t.finished_at = time.time()
             return f"{t.id} done: analyze (no model; goal stored)"
 
         if t.kind == "design":
@@ -289,8 +293,10 @@ async def run_next_task(ctx) -> str:
                 approach = design.get("approach", "")[:300]
                 changes = design.get("changes", [])
                 t.status = "done"
+                t.finished_at = time.time()
                 return f"{t.id} done: design\n{approach}\nchanges: {len(changes)} files"
             t.status = "done"
+            t.finished_at = time.time()
             return f"{t.id} done: design (no model)"
 
         if t.kind == "implement":
@@ -309,6 +315,7 @@ async def run_next_task(ctx) -> str:
             strategy = (design.get("approach") or "").strip() if isinstance(design, dict) else None
             out = await _implement_in_worktree(ctx, str(t.input), candidates, strategy=strategy, task_id=t.id)
             t.status = "done"
+            t.finished_at = time.time()
             return f"{t.id} done: implement\n{out}"
 
         if t.kind == "gates":
@@ -317,17 +324,21 @@ async def run_next_task(ctx) -> str:
                 from agent_ext.self_improve.models import GatePlan
             except ImportError:
                 t.status = "done"
+                t.finished_at = time.time()
                 return f"{t.id} done: gates (self_improve not available)"
             gates = run_gates(GatePlan(import_check=True, compile_check=True, pytest_paths=[]))
             t.status = "done"
+            t.finished_at = time.time()
             return f"{t.id} done: gates\nok={gates.ok}\n{gates.details}"
 
         # Unknown task kind
         t.status = "done"
+        t.finished_at = time.time()
         return f"{t.id} done: {t.kind} (stub)"
 
     except Exception as e:
         t.status = "failed"
+        t.finished_at = time.time()
         return f"{t.id} failed: {e!r}"
 
 
