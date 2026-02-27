@@ -12,7 +12,9 @@ def _ensure_root_importable() -> None:
 
 _ensure_root_importable()
 
-
+# ---------------------------------------------------------------------------
+# Lightweight, always-needed imports (fast: ~10ms total)
+# ---------------------------------------------------------------------------
 from .run_context import RunContext, ToolCall, ToolResult
 from .hooks.base import Hook, BlockedToolCall, BlockedPrompt
 from .hooks.builtins import AuditHook, PolicyHook, ContentFilterHook, ContentFilterFn, make_blocklist_filter
@@ -24,48 +26,18 @@ from .backends.local_fs import LocalFilesystemBackend
 from .backends.sandbox_exec import LocalSubprocessExecBackend
 from .memory.summarize import SummarizingMemory
 from .memory.window import SlidingWindowMemory
-from .subagents.base import Subagent, SubagentResult
-from .subagents.orchestrator import SubagentOrchestrator
-from .subagents.registry import SubagentRegistry
-from .rlm.policies import RLMPolicy
-from .rlm.python_runner import run_restricted_python
-from .ingest.models import DocumentInput, IngestResult, PageImage, OCRPage, OCRSpan, PageOCROutput, PageOCRElement
-from .ingest.pdf_to_images import PDFToImages
-from .ingest.ocr_engines import OCREngine
-from .ingest.extractors import PageExtractor
-from .ingest.validation import OCRValidator, OCRValidationPolicy
-from .ingest.validation_evidence import ValidationEvidenceEmitter
-from .ingest.pipeline import IngestPipeline
-from .ingest.retry_planner import OCRRetryAction
-from .ingest.multi_extractor import MultiExtractor
 from .todo.models import Task, TaskCreate, TaskPatch, TaskQuery, TaskStatus
-from .export.models import ExportResult, ExportRequest
-from .export.base import Exporter
-from .export.html_writer import HtmlExporter
-from .export.docx_writer import DocxExporter
-from .export.pdf_writer import PdfExporter
-try:
-    from .export.pptx_writer import PptxExporter
-except ImportError:
-    PptxExporter = None  # type: ignore[misc, assignment]
-
-
-# Optional: pydantic-ai (agent + vision OCR). Omit from core deps to avoid version/Starlette conflicts.
-# If your app already has pydantic-ai, these will use it; else install with: pip install agent-patterns[agent]
-try:
-    from .ingest.llm_ocr_engine import LLMVisionOCREngine
-except ImportError:
-    LLMVisionOCREngine = None  # type: ignore[misc, assignment]
-try:
-    from .agent.base import PydanticAIAgentBase
-except ImportError:
-    PydanticAIAgentBase = None  # type: ignore[misc, assignment]
 from .todo.store_base import TaskStore
 from .todo.store_memory import InMemoryTaskStore
-from .todo.store_postgres import PostgresTaskStore
 from .todo.events import TaskEvent, TaskEventBus, InProcessEventBus, WebhookEventBus
 from .todo.toolset import TodoToolset
+from .export.models import ExportResult, ExportRequest
+from .export.base import Exporter
 
+# ---------------------------------------------------------------------------
+# Heavy imports deferred via __getattr__ (pydantic-ai ~0.5s, exporters, etc.)
+# These are only loaded when explicitly accessed by name.
+# ---------------------------------------------------------------------------
 
 __all__ = [
     "RunContext", "ToolCall", "ToolResult",
@@ -90,10 +62,70 @@ __all__ = [
     "TodoToolset",
     "ExportResult", "ExportRequest",
     "Exporter", "HtmlExporter", "DocxExporter", "PdfExporter", "PptxExporter",
+    "LLMVisionOCREngine",
+    "PydanticAIAgentBase",
 ]
-if LLMVisionOCREngine is not None:
-    __all__.append("LLMVisionOCREngine")
-if PydanticAIAgentBase is not None:
-    __all__.append("PydanticAIAgentBase")
+
+# Lazy-loaded module cache
+_lazy_cache: dict[str, object] = {}
+
+# Map of name → (module_path, attr_name) for heavy imports
+_LAZY_IMPORTS: dict[str, tuple[str, str]] = {
+    # Subagents (light, but keeps pattern consistent)
+    "Subagent": ("agent_ext.subagents.base", "Subagent"),
+    "SubagentResult": ("agent_ext.subagents.base", "SubagentResult"),
+    "SubagentOrchestrator": ("agent_ext.subagents.orchestrator", "SubagentOrchestrator"),
+    "SubagentRegistry": ("agent_ext.subagents.registry", "SubagentRegistry"),
+    # RLM
+    "RLMPolicy": ("agent_ext.rlm.policies", "RLMPolicy"),
+    "run_restricted_python": ("agent_ext.rlm.python_runner", "run_restricted_python"),
+    # Ingest (pulls in pdf libs)
+    "DocumentInput": ("agent_ext.ingest.models", "DocumentInput"),
+    "IngestResult": ("agent_ext.ingest.models", "IngestResult"),
+    "PageImage": ("agent_ext.ingest.models", "PageImage"),
+    "OCRPage": ("agent_ext.ingest.models", "OCRPage"),
+    "OCRSpan": ("agent_ext.ingest.models", "OCRSpan"),
+    "PageOCROutput": ("agent_ext.ingest.models", "PageOCROutput"),
+    "PageOCRElement": ("agent_ext.ingest.models", "PageOCRElement"),
+    "PDFToImages": ("agent_ext.ingest.pdf_to_images", "PDFToImages"),
+    "OCREngine": ("agent_ext.ingest.ocr_engines", "OCREngine"),
+    "PageExtractor": ("agent_ext.ingest.extractors", "PageExtractor"),
+    "OCRValidator": ("agent_ext.ingest.validation", "OCRValidator"),
+    "OCRValidationPolicy": ("agent_ext.ingest.validation", "OCRValidationPolicy"),
+    "ValidationEvidenceEmitter": ("agent_ext.ingest.validation_evidence", "ValidationEvidenceEmitter"),
+    "IngestPipeline": ("agent_ext.ingest.pipeline", "IngestPipeline"),
+    "OCRRetryAction": ("agent_ext.ingest.retry_planner", "OCRRetryAction"),
+    "MultiExtractor": ("agent_ext.ingest.multi_extractor", "MultiExtractor"),
+    # Exporters (pull in reportlab, docx, pptx)
+    "HtmlExporter": ("agent_ext.export.html_writer", "HtmlExporter"),
+    "DocxExporter": ("agent_ext.export.docx_writer", "DocxExporter"),
+    "PdfExporter": ("agent_ext.export.pdf_writer", "PdfExporter"),
+    "PptxExporter": ("agent_ext.export.pptx_writer", "PptxExporter"),
+    # Postgres task store (pulls asyncpg)
+    "PostgresTaskStore": ("agent_ext.todo.store_postgres", "PostgresTaskStore"),
+    # Pydantic-AI agent (pulls pydantic-ai ~0.5s)
+    "PydanticAIAgentBase": ("agent_ext.agent.base", "PydanticAIAgentBase"),
+    # LLM Vision OCR (pulls pydantic-ai)
+    "LLMVisionOCREngine": ("agent_ext.ingest.llm_ocr_engine", "LLMVisionOCREngine"),
+}
+
+
+def __getattr__(name: str) -> object:
+    if name in _lazy_cache:
+        return _lazy_cache[name]
+    if name in _LAZY_IMPORTS:
+        mod_path, attr = _LAZY_IMPORTS[name]
+        import importlib
+        try:
+            mod = importlib.import_module(mod_path)
+            obj = getattr(mod, attr)
+            _lazy_cache[name] = obj
+            return obj
+        except (ImportError, AttributeError):
+            # Optional dependency not installed — return None for back-compat
+            _lazy_cache[name] = None  # type: ignore[assignment]
+            return None
+    raise AttributeError(f"module 'agent_ext' has no attribute {name!r}")
+
 
 __version__ = "0.1.0"

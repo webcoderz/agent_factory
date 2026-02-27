@@ -4,13 +4,6 @@ import os
 from dataclasses import dataclass
 from typing import Any, Optional
 
-try:
-    from pydantic_ai.models.openai import OpenAIChatModel
-    from pydantic_ai.providers.openai import OpenAIProvider
-except Exception:  # pragma: no cover
-    OpenAIChatModel = None
-    OpenAIProvider = None
-
 
 @dataclass
 class ModelConfig:
@@ -34,9 +27,15 @@ def model_from_env(prefix: str = "LLM_") -> ModelConfig:
 
 def build_openai_chat_model(cfg: ModelConfig) -> Any:
     """
-    Returns OpenAIChatModel(model_name, provider=OpenAIProvider(base_url=..., api_key=...))
+    Returns OpenAIChatModel(model_name, provider=OpenAIProvider(base_url=..., api_key=...)).
+    Imports pydantic-ai lazily so startup is fast when no model is requested.
     """
-    if OpenAIChatModel is None or OpenAIProvider is None:
-        raise RuntimeError("pydantic-ai not installed. Install agent-patterns[agent] or pydantic-ai.")
+    try:
+        from pydantic_ai.models.openai import OpenAIChatModel
+        from pydantic_ai.providers.openai import OpenAIProvider
+    except ImportError:
+        raise RuntimeError(
+            "pydantic-ai not installed. Install agent-patterns[agent] or pydantic-ai."
+        )
     provider = OpenAIProvider(base_url=cfg.base_url, api_key=cfg.api_key)
     return OpenAIChatModel(cfg.model, provider=provider)
