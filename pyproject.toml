@@ -34,6 +34,12 @@ only-include = ["agent_ext"]
 "run_context.py" = "agent_patterns/run_context.py"
 "config.py" = "agent_patterns/config.py"
 
+[dependency-groups]
+dev = [
+    "pytest>=9.0.2",
+    "pytest-asyncio>=1.3.0",
+]
+
 [project.scripts]
 workbench = "agent_ext.workbench.__main__:main"
 agent-cog-daemon = "agent_ext.cog.__main__:main"
