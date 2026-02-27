@@ -205,6 +205,9 @@ async def run_next_task(ctx) -> str:
     try:
         if t.kind == "search":
             query = str(t.input).strip()
+            # Notify if BM25 index will be built on first search
+            if not ctx.search._index_ready:
+                ctx.logger.info("Building search index (first search)…")
             # Run repo_grep (literal substring) and BM25 (index) in parallel
             calls = [
                 ("repo_grep", query, {"root": ".", "limit": 25, "regex": False}),
