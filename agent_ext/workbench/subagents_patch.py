@@ -1,18 +1,11 @@
 from __future__ import annotations
 
-from dataclasses import dataclass
 from pathlib import Path
 from typing import Any, Dict, List, Optional
 
 from .loop import LLM_TRACE_MAX, LLM_TRACE_PROMPT_LEN, LLM_TRACE_RESPONSE_LEN
 from .patch_models import PatchOutput, structured_to_unified_diff
-
-@dataclass
-class SubagentResult:
-    ok: bool
-    name: str
-    output: Any
-    meta: Dict[str, Any]
+from .subagents import SubagentResult
 
 def _read_snippet(root: Path, rel_path: str, max_chars: int = 6000) -> str:
     p = root / rel_path

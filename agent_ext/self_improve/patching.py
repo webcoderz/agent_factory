@@ -22,9 +22,7 @@ def _extract_diff_from_lines(lines: list[str]) -> str:
         # Valid: @@ -1,3 +1,4 @@  ; LLM sometimes outputs bare @@ (we repair later)
         if ln.startswith("@@"):
             return True
-        if ln == "":
-            return True
-        if len(ln) >= 1 and ln[0] == " ":  # context line
+        if len(ln) >= 1 and ln[0] == " ":  # context line (must have leading space)
             return True
         if len(ln) >= 1 and ln[0] == "+" and not ln.startswith("+++ "):  # added line
             return True
@@ -33,6 +31,8 @@ def _extract_diff_from_lines(lines: list[str]) -> str:
         # Git diff header lines (between "diff --git" and "---"/"+++")
         if ln.startswith("index ") or ln.startswith("new file mode ") or ln.startswith("old mode ") or ln.startswith("deleted file mode "):
             return True
+        # Empty lines are NOT valid diff lines by themselves;
+        # context lines in a diff have a leading space character.
         return False
 
     end = start
@@ -45,7 +45,7 @@ def _extract_diff_from_lines(lines: list[str]) -> str:
 
 
 # Valid hunk header: @@ -L1,N1 +L2,N2 @@ (optional trailing text)
-_HUNK_HEADER_RE = re.compile(r"^@@ -\d+,\d+ +\d+,\d+ @@")
+_HUNK_HEADER_RE = re.compile(r"^@@ -\d+,\d+ \+\d+,\d+ @@")
 
 
 def _repair_hunk_headers(diff: str) -> str:
@@ -80,13 +80,14 @@ def _repair_hunk_headers(diff: str) -> str:
         # Malformed: collect hunk body and build valid header
         n_old = n_new = 0
         j = i + 1
-        while j < len(lines) and not (lines[j].startswith("@@") or lines[j].startswith("diff --git")):
+        while j < len(lines) and not (lines[j].startswith("@@") or lines[j].startswith("diff --git") or lines[j].startswith("--- ")):
             ln = lines[j]
             if ln.startswith("-") and not ln.startswith("--- "):
                 n_old += 1
             elif ln.startswith("+") and not ln.startswith("+++ "):
                 n_new += 1
-            elif ln == "" or (ln.startswith(" ") and len(ln) >= 1):
+            elif ln.startswith(" ") and len(ln) >= 1:
+                # Context line (leading space)
                 n_old += 1
                 n_new += 1
             j += 1

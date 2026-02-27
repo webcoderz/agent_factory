@@ -71,9 +71,15 @@ def create_worktree(
 
 def worktree_diff(wt: WorktreeHandle) -> str:
     """
-    Unified diff of changes in the worktree.
+    Unified diff of ALL changes in the worktree (edits + new files).
+    Stages everything first so new (untracked) files are captured.
     """
-    ok, out = _run(["git", "diff"], cwd=wt.path)
+    # Stage all changes (including new/untracked files)
+    ok, out = _run(["git", "add", "-A"], cwd=wt.path)
+    if not ok:
+        raise RuntimeError(f"git add -A failed: {out}")
+    # Diff staged changes against HEAD to capture everything
+    ok, out = _run(["git", "diff", "--cached", "HEAD"], cwd=wt.path)
     if not ok:
         raise RuntimeError(out)
     return out

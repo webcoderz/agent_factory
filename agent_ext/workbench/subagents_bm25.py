@@ -1,13 +1,7 @@
 from __future__ import annotations
-from dataclasses import dataclass
 from typing import Any, Dict, List
 
-@dataclass
-class SubagentResult:
-    ok: bool
-    name: str
-    output: Any
-    meta: Dict[str, Any]
+from .subagents import SubagentResult
 
 class BM25SearchSubagent:
     name = "bm25"

@@ -41,9 +41,12 @@ def structured_to_unified_diff(patch: PatchOutput) -> str:
     for fp in patch.files:
         path = fp.path.replace("\\", "/").lstrip("/")
         if fp.is_new_file:
-            out.append(f"--- /dev/null")
+            out.append(f"diff --git a/{path} b/{path}")
+            out.append("new file mode 100644")
+            out.append("--- /dev/null")
             out.append(f"+++ b/{path}")
         else:
+            out.append(f"diff --git a/{path} b/{path}")
             out.append(f"--- a/{path}")
             out.append(f"+++ b/{path}")
         # Single hunk: compute line counts
