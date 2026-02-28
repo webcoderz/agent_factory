@@ -1,4 +1,4 @@
-"""Multi-agent orchestration — registries, message bus, task manager."""
+"""Multi-agent orchestration — registries, message bus, task manager, prompts."""
 
 from .base import Subagent, SubagentResult
 from .registry import SubagentRegistry, DynamicAgentRegistry
@@ -16,6 +16,13 @@ from .types import (
     decide_execution_mode,
 )
 from .message_bus import InMemoryMessageBus, TaskManager, create_message_bus
+from .prompts import (
+    SUBAGENT_SYSTEM_PROMPT,
+    TASK_TOOL_DESCRIPTION,
+    get_subagent_system_prompt,
+    get_task_instructions_prompt,
+)
+from .protocols import SubAgentDepsProtocol
 
 __all__ = [
     "Subagent",

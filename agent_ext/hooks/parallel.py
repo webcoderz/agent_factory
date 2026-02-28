@@ -20,14 +20,7 @@ from agent_ext.run_context import RunContext
 from .base import AgentMiddleware
 from .context import HookType, MiddlewareContext
 from .exceptions import ParallelExecutionFailed
-
-
-class AggregationStrategy(str, Enum):
-    """How to combine results from parallel middleware."""
-
-    ALL_MUST_PASS = "all_must_pass"
-    FIRST_WINS = "first_wins"
-    MERGE = "merge"
+from .strategies import AggregationStrategy
 
 
 class ParallelMiddleware(AgentMiddleware):

@@ -12,6 +12,11 @@ from .limits import ModelLimiter
 from .planner import TaskQueue
 from .subagents import SubagentOrchestrator, SubagentRegistry, RepoGrepSubagent, PlannerSubagent
 from .subagents_patch import LLMPatchSubagent
+from agent_ext.hooks.chain import MiddlewareChain
+from agent_ext.hooks.builtins import AuditHook, PolicyHook
+from agent_ext.hooks.context import MiddlewareContext
+from agent_ext.subagents.message_bus import InMemoryMessageBus, TaskManager
+from agent_ext.modules.registry import ModuleRegistry
 from agent_ext.workflow.registry import Registry as WorkflowRegistry
 from agent_ext.workflow.builtins import register_builtins as register_workflow_builtins
 from agent_ext.workflow.experience import ExperienceStore
@@ -92,6 +97,22 @@ def build_ctx(
     reg.register(LLMPatchSubagent())
     ctx.subagents = reg
     ctx.orchestrator = SubagentOrchestrator(reg)
+    # Middleware chain (async hooks)
+    ctx.middleware_chain = MiddlewareChain([AuditHook(), PolicyHook()])
+    ctx.middleware_context = MiddlewareContext(config={
+        "case_id": case_id,
+        "session_id": session_id,
+        "max_parallel_subagents": max_parallel_subagents,
+    })
+    # Message bus for inter-agent communication
+    ctx.message_bus = InMemoryMessageBus()
+    ctx.task_manager = TaskManager(message_bus=ctx.message_bus)
+    # Module registry (load builtins)
+    ctx.module_registry = ModuleRegistry()
+    try:
+        ctx.module_registry.load_all_builtins(ctx)
+    except Exception:
+        pass  # non-fatal if modules fail to load
     # Commands map (TUI)
     ctx.commands = {}
     # Run state for plan → design → implement (search results, design output, etc.)

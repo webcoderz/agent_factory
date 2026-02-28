@@ -16,9 +16,13 @@ _ensure_root_importable()
 # Lightweight, always-needed imports (fast: ~10ms total)
 # ---------------------------------------------------------------------------
 from .run_context import RunContext, ToolCall, ToolResult
-from .hooks.base import Hook, BlockedToolCall, BlockedPrompt
-from .hooks.builtins import AuditHook, PolicyHook, ContentFilterHook, ContentFilterFn, make_blocklist_filter
-from .hooks.chain import HookChain
+from .hooks.base import Hook, BlockedToolCall, BlockedPrompt, AgentMiddleware
+from .hooks.builtins import AuditHook, PolicyHook, ContentFilterHook, ContentFilterFn, make_blocklist_filter, ConditionalMiddleware
+from .hooks.chain import HookChain, MiddlewareChain
+from .hooks.context import MiddlewareContext, ScopedContext, HookType, ContextAccessError
+from .hooks.exceptions import InputBlocked, ToolBlocked, OutputBlocked, BudgetExceededError, MiddlewareTimeout, MiddlewareError
+from .hooks.permissions import ToolDecision, ToolPermissionResult, PermissionHandler
+from .hooks.strategies import AggregationStrategy, GuardrailTiming
 from .evidence.models import Citation, Provenance, Evidence
 from .skills.models import SkillSpec, LoadedSkill
 from .skills.registry import SkillRegistry
@@ -41,9 +45,18 @@ from .export.base import Exporter
 
 __all__ = [
     "RunContext", "ToolCall", "ToolResult",
-    "Hook", "BlockedToolCall", "BlockedPrompt",
+    # Hooks / middleware
+    "AgentMiddleware", "Hook", "BlockedToolCall", "BlockedPrompt",
     "AuditHook", "PolicyHook", "ContentFilterHook", "ContentFilterFn", "make_blocklist_filter",
-    "HookChain",
+    "ConditionalMiddleware",
+    "HookChain", "MiddlewareChain",
+    "MiddlewareContext", "ScopedContext", "HookType", "ContextAccessError",
+    "InputBlocked", "ToolBlocked", "OutputBlocked", "BudgetExceededError", "MiddlewareTimeout", "MiddlewareError",
+    "ToolDecision", "ToolPermissionResult", "PermissionHandler",
+    "AggregationStrategy", "GuardrailTiming",
+    "CostTrackingMiddleware", "CostInfo",
+    "ParallelMiddleware", "AsyncGuardrailMiddleware",
+    "middleware_from_functions",
     "Citation", "Provenance", "Evidence",
     "SkillSpec", "LoadedSkill",
     "SkillRegistry",
@@ -71,14 +84,42 @@ _lazy_cache: dict[str, object] = {}
 
 # Map of name → (module_path, attr_name) for heavy imports
 _LAZY_IMPORTS: dict[str, tuple[str, str]] = {
-    # Subagents (light, but keeps pattern consistent)
+    # Hooks (deferred heavy)
+    "CostTrackingMiddleware": ("agent_ext.hooks.cost_tracking", "CostTrackingMiddleware"),
+    "CostInfo": ("agent_ext.hooks.cost_tracking", "CostInfo"),
+    "ParallelMiddleware": ("agent_ext.hooks.parallel", "ParallelMiddleware"),
+    "AsyncGuardrailMiddleware": ("agent_ext.hooks.async_guardrail", "AsyncGuardrailMiddleware"),
+    "middleware_from_functions": ("agent_ext.hooks.decorators", "middleware_from_functions"),
+    # Subagents
     "Subagent": ("agent_ext.subagents.base", "Subagent"),
     "SubagentResult": ("agent_ext.subagents.base", "SubagentResult"),
     "SubagentOrchestrator": ("agent_ext.subagents.orchestrator", "SubagentOrchestrator"),
     "SubagentRegistry": ("agent_ext.subagents.registry", "SubagentRegistry"),
+    "DynamicAgentRegistry": ("agent_ext.subagents.registry", "DynamicAgentRegistry"),
+    "InMemoryMessageBus": ("agent_ext.subagents.message_bus", "InMemoryMessageBus"),
+    "TaskManager": ("agent_ext.subagents.message_bus", "TaskManager"),
+    "SubAgentConfig": ("agent_ext.subagents.types", "SubAgentConfig"),
     # RLM
     "RLMPolicy": ("agent_ext.rlm.policies", "RLMPolicy"),
     "run_restricted_python": ("agent_ext.rlm.python_runner", "run_restricted_python"),
+    "REPLEnvironment": ("agent_ext.rlm.repl", "REPLEnvironment"),
+    "GroundedResponse": ("agent_ext.rlm.models", "GroundedResponse"),
+    "RLMConfig": ("agent_ext.rlm.models", "RLMConfig"),
+    # Backends (new)
+    "StateBackend": ("agent_ext.backends.state", "StateBackend"),
+    "PermissionChecker": ("agent_ext.backends.permissions", "PermissionChecker"),
+    "READONLY_RULESET": ("agent_ext.backends.permissions", "READONLY_RULESET"),
+    "PERMISSIVE_RULESET": ("agent_ext.backends.permissions", "PERMISSIVE_RULESET"),
+    "format_hashline_output": ("agent_ext.backends.hashline", "format_hashline_output"),
+    "apply_hashline_edit": ("agent_ext.backends.hashline", "apply_hashline_edit"),
+    # Database
+    "SQLiteDatabase": ("agent_ext.database.sqlite", "SQLiteDatabase"),
+    "DatabaseConfig": ("agent_ext.database.types", "DatabaseConfig"),
+    # Skills (new registries)
+    "create_skill": ("agent_ext.skills.models", "create_skill"),
+    "CombinedRegistry": ("agent_ext.skills.registries.combined", "CombinedRegistry"),
+    "FilteredRegistry": ("agent_ext.skills.registries.filtered", "FilteredRegistry"),
+    "PrefixedRegistry": ("agent_ext.skills.registries.prefixed", "PrefixedRegistry"),
     # Ingest (pulls in pdf libs)
     "DocumentInput": ("agent_ext.ingest.models", "DocumentInput"),
     "IngestResult": ("agent_ext.ingest.models", "IngestResult"),

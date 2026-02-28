@@ -17,8 +17,11 @@ from .exceptions import (
     ParallelExecutionFailed,
     ToolBlocked,
 )
-from .parallel import AggregationStrategy, ParallelMiddleware
+from .parallel import ParallelMiddleware
 from .permissions import PermissionHandler, ToolDecision, ToolPermissionResult
+from .strategies import AggregationStrategy, GuardrailTiming
+from .async_guardrail import AsyncGuardrailMiddleware
+from .decorators import middleware_from_functions
 from .builtins import (
     AuditHook,
     ConditionalMiddleware,
@@ -56,9 +59,14 @@ __all__ = [
     "OutputBlocked",
     "ParallelExecutionFailed",
     "ToolBlocked",
-    # Parallel
+    # Parallel + Strategies
     "AggregationStrategy",
+    "GuardrailTiming",
     "ParallelMiddleware",
+    # Async guardrail
+    "AsyncGuardrailMiddleware",
+    # Decorators
+    "middleware_from_functions",
     # Permissions
     "PermissionHandler",
     "ToolDecision",
