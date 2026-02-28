@@ -159,6 +159,7 @@ _LAZY_IMPORTS: dict[str, tuple[str, str]] = {
     "PostgresTaskStore": ("agent_ext.todo.store_postgres", "PostgresTaskStore"),
     # Pydantic-AI agent (pulls pydantic-ai ~0.5s)
     "PydanticAIAgentBase": ("agent_ext.agent.base", "PydanticAIAgentBase"),
+    "AgentPatterns": ("agent_ext.agent.agent", "AgentPatterns"),
     # LLM Vision OCR (pulls pydantic-ai)
     "LLMVisionOCREngine": ("agent_ext.ingest.llm_ocr_engine", "LLMVisionOCREngine"),
 }

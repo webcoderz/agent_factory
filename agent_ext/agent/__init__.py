@@ -1,6 +1,8 @@
+"""Agent classes — PydanticAIAgentBase (low-level) and AgentPatterns (batteries-included)."""
 from __future__ import annotations
 
 from .base import PydanticAIAgentBase
+from .agent import AgentPatterns
 from .memory_adapter import (
     build_history_processor,
     checkpoint_after_run,
@@ -12,6 +14,7 @@ from .memory_adapter import (
 
 __all__ = [
     "PydanticAIAgentBase",
+    "AgentPatterns",
     "build_history_processor",
     "checkpoint_after_run",
     "has_tool_calls",
