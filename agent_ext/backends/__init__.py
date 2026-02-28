@@ -18,6 +18,7 @@ from .permissions import (
     create_ruleset,
 )
 from .hashline import apply_hashline_edit, format_hashline_output, line_hash
+from .console import create_console_toolset, ConsoleDeps, CONSOLE_SYSTEM_PROMPT
 
 __all__ = [
     # Base protocols

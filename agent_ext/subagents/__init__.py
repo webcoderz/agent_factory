@@ -23,6 +23,7 @@ from .prompts import (
     get_task_instructions_prompt,
 )
 from .protocols import SubAgentDepsProtocol
+from .toolset import create_subagent_toolset, SubAgentDeps
 
 __all__ = [
     "Subagent",

@@ -115,6 +115,19 @@ _LAZY_IMPORTS: dict[str, tuple[str, str]] = {
     # Database
     "SQLiteDatabase": ("agent_ext.database.sqlite", "SQLiteDatabase"),
     "DatabaseConfig": ("agent_ext.database.types", "DatabaseConfig"),
+    "create_database_toolset": ("agent_ext.database.toolset", "create_database_toolset"),
+    "SQLDatabaseDeps": ("agent_ext.database.toolset", "SQLDatabaseDeps"),
+    # Console toolset
+    "create_console_toolset": ("agent_ext.backends.console", "create_console_toolset"),
+    "ConsoleDeps": ("agent_ext.backends.console", "ConsoleDeps"),
+    # Subagent toolset
+    "create_subagent_toolset": ("agent_ext.subagents.toolset", "create_subagent_toolset"),
+    "SubAgentDeps": ("agent_ext.subagents.toolset", "SubAgentDeps"),
+    # RLM toolset
+    "create_rlm_toolset": ("agent_ext.rlm.toolset", "create_rlm_toolset"),
+    # Todo toolset (pydantic-ai)
+    "create_todo_toolset": ("agent_ext.todo.pai_toolset", "create_todo_toolset"),
+    "TodoDeps": ("agent_ext.todo.pai_toolset", "TodoDeps"),
     # Skills (new registries)
     "create_skill": ("agent_ext.skills.models", "create_skill"),
     "CombinedRegistry": ("agent_ext.skills.registries.combined", "CombinedRegistry"),
