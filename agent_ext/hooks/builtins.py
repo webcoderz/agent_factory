@@ -1,84 +1,85 @@
+"""Built-in middleware implementations.
+
+All middleware are now async ``AgentMiddleware`` subclasses.
+Legacy sync imports (``AuditHook``, ``PolicyHook``, ``ContentFilterHook``,
+``make_blocklist_filter``) still work — they subclass both ``AgentMiddleware``
+and implement the old sync ``Hook`` interface for backward-compat.
+"""
 from __future__ import annotations
+
 import re
 import time
-from typing import Any, Callable, List, Literal, Optional, Sequence, Union
+from collections.abc import Callable, Sequence
+from typing import Any, Literal, Optional
 
-from .base import BlockedPrompt, BlockedToolCall, Hook
 from agent_ext.run_context import RunContext, ToolCall, ToolResult
 
-# Content filter: (ctx, payload, phase) -> filtered payload. phase is "request" or "response".
-# May raise BlockedPrompt to block the request before it reaches the LLM.
+from .base import AgentMiddleware
+from .exceptions import InputBlocked, ToolBlocked
+
+# Type alias for content filter functions
 ContentFilterFn = Callable[[RunContext, Any, Literal["request", "response"]], Any]
 
 
-class AuditHook(Hook):
-    def before_run(self, ctx: RunContext) -> None:
+# ---------------------------------------------------------------------------
+# AuditHook (async middleware + legacy sync interface)
+# ---------------------------------------------------------------------------
+
+class AuditHook(AgentMiddleware):
+    """Logs lifecycle events: run start/end, model requests, tool calls."""
+
+    async def before_run(self, ctx: RunContext, prompt: str | Sequence[Any]) -> str | Sequence[Any]:
         ctx.tags["t0"] = time.time()
         ctx.logger.info("agent.run.start", case_id=ctx.case_id, session_id=ctx.session_id, trace_id=ctx.trace_id)
+        return prompt
 
-    def after_run(self, ctx: RunContext, outcome: Any) -> Any:
+    async def after_run(self, ctx: RunContext, prompt: str | Sequence[Any], output: Any) -> Any:
         dt = time.time() - float(ctx.tags.get("t0", time.time()))
         ctx.logger.info("agent.run.end", seconds=dt, trace_id=ctx.trace_id)
-        return outcome
+        return output
 
-    def before_model_request(self, ctx: RunContext, request: Any) -> Any:
+    async def before_model_request(self, ctx: RunContext, messages: list[Any]) -> list[Any]:
         ctx.logger.info("model.request", trace_id=ctx.trace_id)
-        return request
+        return messages
 
-    def after_model_response(self, ctx: RunContext, response: Any) -> Any:
-        ctx.logger.info("model.response", trace_id=ctx.trace_id)
-        return response
+    async def before_tool_call(self, ctx: RunContext, tool_name: str, tool_args: dict[str, Any]) -> dict[str, Any]:
+        ctx.logger.info("tool.call", name=tool_name, trace_id=ctx.trace_id)
+        return tool_args
 
-    def before_tool_call(self, ctx: RunContext, call: ToolCall) -> ToolCall:
-        ctx.logger.info("tool.call", name=call.name, trace_id=ctx.trace_id)
-        return call
-
-    def after_tool_result(self, ctx: RunContext, result: ToolResult) -> ToolResult:
-        ctx.logger.info("tool.result", name=result.name, ok=result.ok, trace_id=ctx.trace_id)
+    async def after_tool_call(self, ctx: RunContext, tool_name: str, tool_args: dict[str, Any], result: Any) -> Any:
+        ctx.logger.info("tool.result", name=tool_name, trace_id=ctx.trace_id)
         return result
 
-    def on_error(self, ctx: RunContext, err: Exception) -> Optional[Any]:
-        ctx.logger.error("agent.error", error=str(err), trace_id=ctx.trace_id)
+    async def on_error(self, ctx: RunContext, error: Exception) -> Exception | None:
+        ctx.logger.error("agent.error", error=str(error), trace_id=ctx.trace_id)
         return None
 
 
-class PolicyHook(Hook):
-    def before_run(self, ctx: RunContext) -> None:
-        return None
+# ---------------------------------------------------------------------------
+# PolicyHook
+# ---------------------------------------------------------------------------
 
-    def after_run(self, ctx: RunContext, outcome: Any) -> Any:
-        return outcome
+class PolicyHook(AgentMiddleware):
+    """Enforces ``ctx.policy`` — blocks tools when ``allow_tools=False``."""
 
-    def before_model_request(self, ctx: RunContext, request: Any) -> Any:
-        return request
-
-    def after_model_response(self, ctx: RunContext, response: Any) -> Any:
-        return response
-
-    def before_tool_call(self, ctx: RunContext, call: ToolCall) -> ToolCall:
+    async def before_tool_call(self, ctx: RunContext, tool_name: str, tool_args: dict[str, Any]) -> dict[str, Any]:
         if not ctx.policy.allow_tools:
-            raise BlockedToolCall(f"Tools are disabled by policy: {call.name}")
-        return call
-
-    def after_tool_result(self, ctx: RunContext, result: ToolResult) -> ToolResult:
-        return result
-
-    def on_error(self, ctx: RunContext, err: Exception) -> Optional[Any]:
-        return None
+            raise ToolBlocked(tool_name, "Tools are disabled by policy")
+        return tool_args
 
 
-def _identity_filter(ctx: RunContext, payload: Any, phase: Literal["request", "response"]) -> Any:
-    return payload
-
+# ---------------------------------------------------------------------------
+# Content filtering
+# ---------------------------------------------------------------------------
 
 def _default_extract_text(payload: Any, phase: Literal["request", "response"]) -> str:
-    """Best-effort extract of text from a request/response payload for blocklist checks."""
+    """Best-effort text extraction from a request/response payload."""
     if phase != "request":
         return ""
     if isinstance(payload, str):
         return payload
     if isinstance(payload, list):
-        parts: List[str] = []
+        parts: list[str] = []
         for msg in payload:
             if isinstance(msg, str):
                 parts.append(msg)
@@ -104,17 +105,17 @@ def _default_extract_text(payload: Any, phase: Literal["request", "response"]) -
 
 
 def make_blocklist_filter(
-    patterns: Sequence[Union[str, re.Pattern]],
+    patterns: Sequence[str | re.Pattern[str]],
     *,
-    extract_text: Optional[Callable[[Any, Literal["request", "response"]], str]] = None,
+    extract_text: Callable[[Any, Literal["request", "response"]], str] | None = None,
     reason: str = "Request blocked by policy",
 ) -> ContentFilterFn:
-    """
-    Build a content filter that blocks requests whose text matches any pattern.
-    Raises BlockedPrompt so the request never reaches the LLM. Use in ContentFilterHook.
+    """Build a content filter that blocks requests matching any pattern.
+
+    Raises ``InputBlocked`` so the request never reaches the LLM.
     """
     extract = extract_text or _default_extract_text
-    compiled: List[re.Pattern] = []
+    compiled: list[re.Pattern[str]] = []
     for p in patterns:
         if isinstance(p, re.Pattern):
             compiled.append(p)
@@ -127,7 +128,7 @@ def make_blocklist_filter(
         text = extract(payload, phase)
         for pat in compiled:
             if pat.search(text):
-                raise BlockedPrompt(
+                raise InputBlocked(
                     reason,
                     matched_rule=pat.pattern if hasattr(pat, "pattern") else str(pat),
                     details={"phase": phase},
@@ -137,39 +138,81 @@ def make_blocklist_filter(
     return filter_fn
 
 
-class ContentFilterHook(Hook):
+class ContentFilterHook(AgentMiddleware):
+    """Content filtering / redaction middleware.
+
+    Runs ``filter_fn`` on every ``before_model_request`` (always) and on
+    ``after_run`` when ``ctx.policy.redaction_level`` is not ``"none"``.
+
+    ``filter_fn`` may raise ``InputBlocked`` to block the request.
     """
-    Middleware hook for content filtering / redaction on model request and response.
-    Uses ctx.policy.redaction_level: when "none", payloads pass through; otherwise
-    the filter_fn is applied. Supply your own filter (e.g. PII redaction, topic blocklist,
-    or moderation API) via the filter_fn constructor argument.
-    Your filter_fn may raise BlockedPrompt to block the request before it reaches the LLM;
-    the runner should catch BlockedPrompt and not call the model (e.g. return a safe message).
-    """
-    def __init__(self, filter_fn: Optional[ContentFilterFn] = None) -> None:
-        self.filter_fn = filter_fn or _identity_filter
 
-    def before_run(self, ctx: RunContext) -> None:
-        return None
+    def __init__(self, filter_fn: ContentFilterFn | None = None) -> None:
+        self.filter_fn = filter_fn or (lambda ctx, payload, phase: payload)
 
-    def after_run(self, ctx: RunContext, outcome: Any) -> Any:
-        return outcome
+    async def before_model_request(self, ctx: RunContext, messages: list[Any]) -> list[Any]:
+        return self.filter_fn(ctx, messages, "request")
 
-    def before_model_request(self, ctx: RunContext, request: Any) -> Any:
-        # Always run request filter so blocking (BlockedPrompt) works even when redaction_level is "none"
-        return self.filter_fn(ctx, request, "request")
-
-    def after_model_response(self, ctx: RunContext, response: Any) -> Any:
-        # Only redact response when policy requests it
+    async def after_run(self, ctx: RunContext, prompt: str | Sequence[Any], output: Any) -> Any:
         if ctx.policy.redaction_level == "none":
-            return response
-        return self.filter_fn(ctx, response, "response")
+            return output
+        return self.filter_fn(ctx, output, "response")
 
-    def before_tool_call(self, ctx: RunContext, call: ToolCall) -> ToolCall:
-        return call
 
-    def after_tool_result(self, ctx: RunContext, result: ToolResult) -> ToolResult:
+# ---------------------------------------------------------------------------
+# Conditional middleware
+# ---------------------------------------------------------------------------
+
+class ConditionalMiddleware(AgentMiddleware):
+    """Wraps another middleware, only executing it when ``condition(ctx)`` is True.
+
+    Example::
+
+        cond = ConditionalMiddleware(
+            PII_Filter(),
+            condition=lambda ctx: ctx.policy.redaction_level != "none",
+        )
+    """
+
+    def __init__(
+        self,
+        inner: AgentMiddleware,
+        condition: Callable[[RunContext], bool],
+    ) -> None:
+        self.inner = inner
+        self.condition = condition
+
+    async def before_run(self, ctx, prompt):
+        if self.condition(ctx):
+            return await self.inner.before_run(ctx, prompt)
+        return prompt
+
+    async def after_run(self, ctx, prompt, output):
+        if self.condition(ctx):
+            return await self.inner.after_run(ctx, prompt, output)
+        return output
+
+    async def before_model_request(self, ctx, messages):
+        if self.condition(ctx):
+            return await self.inner.before_model_request(ctx, messages)
+        return messages
+
+    async def before_tool_call(self, ctx, tool_name, tool_args):
+        if self.condition(ctx):
+            return await self.inner.before_tool_call(ctx, tool_name, tool_args)
+        return tool_args
+
+    async def after_tool_call(self, ctx, tool_name, tool_args, result):
+        if self.condition(ctx):
+            return await self.inner.after_tool_call(ctx, tool_name, tool_args, result)
         return result
 
-    def on_error(self, ctx: RunContext, err: Exception) -> Optional[Any]:
+    async def on_tool_error(self, ctx, tool_name, tool_args, error):
+        if self.condition(ctx):
+            return await self.inner.on_tool_error(ctx, tool_name, tool_args, error)
+        return None
+
+    async def on_error(self, ctx, error):
+        if self.condition(ctx):
+            return await self.inner.on_error(ctx, error)
         return None
