@@ -5,11 +5,11 @@ data, with optional ``llm_query()`` for sub-model delegation and
 ``GroundedResponse`` for citation-grounded output.
 """
 
+from .models import ContextType, GroundedResponse, REPLResult, RLMConfig, RLMDependencies
 from .policies import RLMPolicy
 from .python_runner import RLMRunError, run_restricted_python
-from .models import ContextType, GroundedResponse, REPLResult, RLMConfig, RLMDependencies
 from .repl import REPLEnvironment, format_repl_result
-from .toolset import create_rlm_toolset, cleanup_repl_environments
+from .toolset import cleanup_repl_environments, create_rlm_toolset
 
 __all__ = [
     "RLMPolicy",

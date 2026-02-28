@@ -2,7 +2,6 @@ from __future__ import annotations
 
 import json
 from pathlib import Path
-from typing import Optional
 
 from .gates import run_gates
 from .models import ImprovementRunRecord, PatchProposal, TriggerEvent
@@ -26,7 +25,9 @@ class SelfImproveController:
         if proposal.unified_diff:
             ok, out = apply_unified_diff(proposal.unified_diff)
             if not ok:
-                rec = ImprovementRunRecord(trigger=trigger, proposal=proposal, gates=run_gates(proposal.gate_plan), adopted=False)
+                rec = ImprovementRunRecord(
+                    trigger=trigger, proposal=proposal, gates=run_gates(proposal.gate_plan), adopted=False
+                )
                 self._write_record(rec, extra={"patch_apply_error": out})
                 return rec
 
@@ -40,7 +41,7 @@ class SelfImproveController:
         self._write_record(rec)
         return rec
 
-    def _write_record(self, rec: ImprovementRunRecord, extra: Optional[dict] = None) -> None:
+    def _write_record(self, rec: ImprovementRunRecord, extra: dict | None = None) -> None:
         payload = {
             "trigger": rec.trigger.__dict__,
             "proposal": {

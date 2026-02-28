@@ -5,9 +5,11 @@ Provides:
 - Token-based cutoff via binary search
 - Message-count cutoff with safety adjustment
 """
+
 from __future__ import annotations
 
-from typing import Any, Callable, List, Sequence
+from collections.abc import Callable, Sequence
+from typing import Any
 
 # Type for token counters: (messages) -> int
 TokenCounter = Callable[[Sequence[Any]], int]
@@ -48,7 +50,7 @@ def _has_tool_return(msg: Any) -> bool:
     return False
 
 
-def is_safe_cutoff_point(messages: List[Any], cutoff_index: int, search_range: int = 5) -> bool:
+def is_safe_cutoff_point(messages: list[Any], cutoff_index: int, search_range: int = 5) -> bool:
     """Check if cutting at *cutoff_index* would split a tool call/response pair.
 
     Returns ``True`` when the cutoff is safe (no pairs are split).
@@ -70,7 +72,7 @@ def is_safe_cutoff_point(messages: List[Any], cutoff_index: int, search_range: i
     return True
 
 
-def find_safe_cutoff(messages: List[Any], messages_to_keep: int) -> int:
+def find_safe_cutoff(messages: list[Any], messages_to_keep: int) -> int:
     """Find a safe cutoff index preserving tool call/response pairs.
 
     Returns the index from which to slice: ``messages[cutoff:]``.
@@ -88,7 +90,7 @@ def find_safe_cutoff(messages: List[Any], messages_to_keep: int) -> int:
 
 
 def find_token_based_cutoff(
-    messages: List[Any],
+    messages: list[Any],
     target_tokens: int,
     token_counter: TokenCounter,
 ) -> int:

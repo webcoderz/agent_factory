@@ -1,20 +1,26 @@
 """Tests for the overhauled skills system."""
+
 from __future__ import annotations
 
 import pytest
 
 from agent_ext.skills import (
-    SkillSpec, LoadedSkill, create_skill,
-    SkillRegistry, SkillLoader,
-    CombinedRegistry, FilteredRegistry, PrefixedRegistry,
+    CombinedRegistry,
+    FilteredRegistry,
+    PrefixedRegistry,
     SkillNotFoundError,
+    SkillRegistry,
+    SkillSpec,
+    create_skill,
 )
 
 
 class TestCreateSkill:
     def test_basic_creation(self):
         skill = create_skill(
-            id="test", name="Test", description="A test",
+            id="test",
+            name="Test",
+            description="A test",
             body="# Test\n\nBody text",
         )
         assert skill.spec.id == "test"
@@ -24,8 +30,11 @@ class TestCreateSkill:
 
     def test_with_tags(self):
         skill = create_skill(
-            id="t", name="T", description="d",
-            body="body", tags=["python", "code"],
+            id="t",
+            name="T",
+            description="d",
+            body="body",
+            tags=["python", "code"],
         )
         assert skill.spec.tags == ["python", "code"]
 

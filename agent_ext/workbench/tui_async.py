@@ -1,9 +1,9 @@
 from __future__ import annotations
 
 import asyncio
+import contextlib
 import re
 import time
-from typing import List, Optional
 
 from rich.console import Console, Group
 from rich.live import Live
@@ -59,7 +59,7 @@ class _LiveSpinner:
 
     def __init__(
         self,
-        message_ref: List[str],
+        message_ref: list[str],
         spinner_name: str = "dots12",
         style: str = "bold cyan",
         use_markup: bool = True,
@@ -122,7 +122,7 @@ def _status_style(status: str) -> str:
     return "dim"
 
 
-def _watch_renderable(ctx, task_id: Optional[str] = None) -> Group:
+def _watch_renderable(ctx, task_id: str | None = None) -> Group:
     """Build the live-updating view for /watch: recent task outputs + last LLM trace."""
     watch_out = getattr(ctx, "watch_outputs", [])
     lines = []
@@ -135,7 +135,12 @@ def _watch_renderable(ctx, task_id: Optional[str] = None) -> Group:
         else:
             lines.append(f"  [dim]{first}[/]")
     task_block = "\n".join(lines) if lines else "[dim]No task output yet. Run /run to see completions here.[/]"
-    task_panel = Panel(task_block, title="[bold]Recent task output[/] [dim](streams as run progresses)[/dim]", border_style="cyan", padding=(0, 1))
+    task_panel = Panel(
+        task_block,
+        title="[bold]Recent task output[/] [dim](streams as run progresses)[/dim]",
+        border_style="cyan",
+        padding=(0, 1),
+    )
     trace_panel = _LiveTraceView(ctx, max_lines=14)
     if task_id:
         # Highlight that we're watching for this task
@@ -150,7 +155,7 @@ def _format_elapsed(elapsed_s: float | None) -> str:
     if elapsed_s is None:
         return "[dim]—[/]"
     if elapsed_s < 1.0:
-        return f"[dim]{elapsed_s*1000:.0f}ms[/]"
+        return f"[dim]{elapsed_s * 1000:.0f}ms[/]"
     if elapsed_s < 60:
         return f"[dim]{elapsed_s:.1f}s[/]"
     mins = int(elapsed_s // 60)
@@ -205,11 +210,13 @@ async def run_tui(ctx) -> None:
     ctx.mcp_server.start()
     console.print(BANNER)
     console.print(Rule(style=BANNER_RULE_STYLE))
-    console.print(Panel.fit(
-        "[bold]/help[/] commands  [bold]/plan <goal>[/]  [bold]/run[/]  [bold]/quit[/]",
-        border_style="cyan",
-        padding=(0, 1),
-    ))
+    console.print(
+        Panel.fit(
+            "[bold]/help[/] commands  [bold]/plan <goal>[/]  [bold]/run[/]  [bold]/quit[/]",
+            border_style="cyan",
+            padding=(0, 1),
+        )
+    )
 
     while True:
         msg = (await _ainput("[bold cyan]you> [/bold cyan]")).strip()
@@ -221,38 +228,42 @@ async def run_tui(ctx) -> None:
             return
 
         if msg == "/help":
-            console.print(Panel(
-                "\n".join([
-                    "[bold white]Planning & Execution[/]",
-                    "  [cyan]/plan <goal>[/]    queue plan (background)",
-                    "  [cyan]/run[/] [dim]or[/] [cyan]/run N[/]    run in background  [cyan]/run N fg[/]  wait & watch",
-                    "  [cyan]/stop[/] [dim]or[/] [cyan]/stop all[/]  cancel run(s)",
-                    "",
-                    "[bold white]Inspection[/]",
-                    "  [cyan]/tasks[/]          task queue with timing",
-                    "  [cyan]/status[/]         case/session + run info",
-                    "  [cyan]/agents[/]         list subagents",
-                    "  [cyan]/watch[/] [dim][id][/]      live view of run + trace",
-                    "  [cyan]/diff[/]           show last generated patch",
-                    "  [cyan]/trace[/]          last LLM trace (full)",
-                    "  [cyan]/traces[/] [dim][N][/]      last N traces (preview)",
-                    "",
-                    "[bold white]Actions[/]",
-                    "  [cyan]/adopt[/]          apply last patch to repo",
-                    "  [cyan]/retry[/] [dim][id][/]      retry failed task(s)",
-                    "  [cyan]/cancel <id>[/]    cancel pending task",
-                    "  [cyan]/ask <q>[/]        one-off LLM question",
-                    "",
-                    "[bold white]Config & Misc[/]",
-                    "  [cyan]/parallel <n>[/]   max subagents",
-                    "  [cyan]/model[/]          model info",
-                    "  [cyan]/workflows[/]      list workflows",
-                    "  [cyan]/clear[/]          clear screen",
-                    "  [cyan]/quit[/]           exit",
-                ]),
-                title="[bold]commands[/bold]",
-                border_style="cyan",
-            ))
+            console.print(
+                Panel(
+                    "\n".join(
+                        [
+                            "[bold white]Planning & Execution[/]",
+                            "  [cyan]/plan <goal>[/]    queue plan (background)",
+                            "  [cyan]/run[/] [dim]or[/] [cyan]/run N[/]    run in background  [cyan]/run N fg[/]  wait & watch",
+                            "  [cyan]/stop[/] [dim]or[/] [cyan]/stop all[/]  cancel run(s)",
+                            "",
+                            "[bold white]Inspection[/]",
+                            "  [cyan]/tasks[/]          task queue with timing",
+                            "  [cyan]/status[/]         case/session + run info",
+                            "  [cyan]/agents[/]         list subagents",
+                            "  [cyan]/watch[/] [dim][id][/]      live view of run + trace",
+                            "  [cyan]/diff[/]           show last generated patch",
+                            "  [cyan]/trace[/]          last LLM trace (full)",
+                            "  [cyan]/traces[/] [dim][N][/]      last N traces (preview)",
+                            "",
+                            "[bold white]Actions[/]",
+                            "  [cyan]/adopt[/]          apply last patch to repo",
+                            "  [cyan]/retry[/] [dim][id][/]      retry failed task(s)",
+                            "  [cyan]/cancel <id>[/]    cancel pending task",
+                            "  [cyan]/ask <q>[/]        one-off LLM question",
+                            "",
+                            "[bold white]Config & Misc[/]",
+                            "  [cyan]/parallel <n>[/]   max subagents",
+                            "  [cyan]/model[/]          model info",
+                            "  [cyan]/workflows[/]      list workflows",
+                            "  [cyan]/clear[/]          clear screen",
+                            "  [cyan]/quit[/]           exit",
+                        ]
+                    ),
+                    title="[bold]commands[/bold]",
+                    border_style="cyan",
+                )
+            )
             continue
 
         if msg == "/status":
@@ -265,11 +276,13 @@ async def run_tui(ctx) -> None:
                 bg_line = f"\n[yellow]{len(active)} run(s) in progress[/] [dim](queue: {done_q} done, {pending_q} pending — /stop or /stop all)[/]"
             else:
                 bg_line = f"\n[dim]queue: {done_q} done, {pending_q} pending[/]"
-            console.print(Panel(
-                f"[bold]case[/]={ctx.case_id}  [bold]session[/]={ctx.session_id}  [bold]user[/]={ctx.user_id}{bg_line}",
-                title="[bold]status[/bold]",
-                border_style="dim",
-            ))
+            console.print(
+                Panel(
+                    f"[bold]case[/]={ctx.case_id}  [bold]session[/]={ctx.session_id}  [bold]user[/]={ctx.user_id}{bg_line}",
+                    title="[bold]status[/bold]",
+                    border_style="dim",
+                )
+            )
             continue
 
         if msg.startswith("/stop"):
@@ -283,37 +296,34 @@ async def run_tui(ctx) -> None:
                 for t in active:
                     t.cancel()
                 for t in active:
-                    try:
+                    with contextlib.suppress(asyncio.CancelledError):
                         await t
-                    except asyncio.CancelledError:
-                        pass
                 ctx.background_run_tasks.clear()
                 console.print(Panel(f"[yellow]Stopped {len(active)} run(s).[/]", title="stop", border_style="yellow"))
             else:
                 t = active[-1]
                 t.cancel()
-                try:
+                with contextlib.suppress(asyncio.CancelledError):
                     await t
-                except asyncio.CancelledError:
-                    pass
-                try:
+                with contextlib.suppress(ValueError):
                     ctx.background_run_tasks.remove(t)
-                except ValueError:
-                    pass
                 console.print(Panel("[yellow]Most recent run stopped.[/]", title="stop", border_style="yellow"))
             continue
 
         if msg == "/agents":
             agents = ctx.subagents.list()
-            console.print(Panel(
-                "\n".join(f"  [cyan]•[/] {a}" for a in agents),
-                title="[bold]subagents[/bold]",
-                border_style="cyan",
-            ))
+            console.print(
+                Panel(
+                    "\n".join(f"  [cyan]•[/] {a}" for a in agents),
+                    title="[bold]subagents[/bold]",
+                    border_style="cyan",
+                )
+            )
             continue
 
         if msg == "/adopt":
             from pathlib import Path
+
             from agent_ext.self_improve.patching import apply_unified_diff
 
             state_dir = Path(".agent_state")
@@ -323,11 +333,13 @@ async def run_tui(ctx) -> None:
             else:
                 diff_path = state_dir / "last_patch.diff"
             if not diff_path.exists():
-                console.print(Panel(
-                    "No saved patch. Run /run and complete an implement step first (patch is saved to .agent_state/patch_<run_id>.diff).",
-                    title="adopt",
-                    border_style="yellow",
-                ))
+                console.print(
+                    Panel(
+                        "No saved patch. Run /run and complete an implement step first (patch is saved to .agent_state/patch_<run_id>.diff).",
+                        title="adopt",
+                        border_style="yellow",
+                    )
+                )
                 continue
             diff = diff_path.read_text(encoding="utf-8")
             ok, out = apply_unified_diff(diff, repo_root=Path("."))
@@ -344,17 +356,41 @@ async def run_tui(ctx) -> None:
         if msg.startswith("/cancel "):
             task_id = msg.split(maxsplit=1)[1].strip() if len(msg.split()) > 1 else ""
             if not task_id:
-                console.print(Panel("[dim]Usage: /cancel <task_id>  e.g. /cancel t0004 or /cancel 0004[/]", title="cancel", border_style="yellow"))
+                console.print(
+                    Panel(
+                        "[dim]Usage: /cancel <task_id>  e.g. /cancel t0004 or /cancel 0004[/]",
+                        title="cancel",
+                        border_style="yellow",
+                    )
+                )
                 continue
             result = await ctx.task_queue.cancel_by_id(task_id)
             if result is True:
-                console.print(Panel(f"[green]Task cancelled.[/] Use [cyan]/tasks[/] to see queue.", title="cancel", border_style="green"))
+                console.print(
+                    Panel(
+                        "[green]Task cancelled.[/] Use [cyan]/tasks[/] to see queue.",
+                        title="cancel",
+                        border_style="green",
+                    )
+                )
             elif result is False:
                 t = ctx.task_queue.get_by_id(task_id)
                 status = t.status if t else "?"
-                console.print(Panel(f"[yellow]Task not pending (status: {status}).[/] Only pending tasks can be cancelled.", title="cancel", border_style="yellow"))
+                console.print(
+                    Panel(
+                        f"[yellow]Task not pending (status: {status}).[/] Only pending tasks can be cancelled.",
+                        title="cancel",
+                        border_style="yellow",
+                    )
+                )
             else:
-                console.print(Panel(f"[red]No task with id '{task_id}'.[/] Use [cyan]/tasks[/] for ids.", title="cancel", border_style="red"))
+                console.print(
+                    Panel(
+                        f"[red]No task with id '{task_id}'.[/] Use [cyan]/tasks[/] for ids.",
+                        title="cancel",
+                        border_style="red",
+                    )
+                )
             continue
 
         if msg == "/clear":
@@ -365,24 +401,31 @@ async def run_tui(ctx) -> None:
 
         if msg == "/diff":
             from pathlib import Path as _DiffPath
+
             from rich.syntax import Syntax
+
             state_dir = _DiffPath(".agent_state")
             path_file = state_dir / "last_patch_path.txt"
             diff_path = None
             if path_file.exists():
                 diff_path = _DiffPath(path_file.read_text(encoding="utf-8").strip())
             if diff_path is None or not diff_path.exists():
-                console.print(Panel(
-                    "[dim]No saved patch yet. Run [cyan]/run[/] to generate one.[/]",
-                    title="diff", border_style="dim",
-                ))
+                console.print(
+                    Panel(
+                        "[dim]No saved patch yet. Run [cyan]/run[/] to generate one.[/]",
+                        title="diff",
+                        border_style="dim",
+                    )
+                )
                 continue
             diff_content = diff_path.read_text(encoding="utf-8")
             if not diff_content.strip():
                 console.print(Panel("[dim]Patch file is empty.[/]", title="diff", border_style="dim"))
                 continue
             syntax = Syntax(diff_content, "diff", theme="monokai", line_numbers=True, word_wrap=True)
-            console.print(Panel(syntax, title=f"[bold]Last patch[/] [dim]({diff_path})[/]", border_style="green", padding=(0, 1)))
+            console.print(
+                Panel(syntax, title=f"[bold]Last patch[/] [dim]({diff_path})[/]", border_style="green", padding=(0, 1))
+            )
             continue
 
         if msg == "/retry" or msg.startswith("/retry "):
@@ -391,17 +434,35 @@ async def run_tui(ctx) -> None:
                 task_id = parts[1].strip()
                 result = await ctx.task_queue.retry_by_id(task_id)
                 if result is True:
-                    console.print(Panel(f"[green]Task reset to pending.[/] Use [cyan]/run[/] to execute.", title="retry", border_style="green"))
+                    console.print(
+                        Panel(
+                            "[green]Task reset to pending.[/] Use [cyan]/run[/] to execute.",
+                            title="retry",
+                            border_style="green",
+                        )
+                    )
                 elif result is False:
                     t = ctx.task_queue.get_by_id(task_id)
                     status = t.status if t else "?"
-                    console.print(Panel(f"[yellow]Task not retryable (status: {status}).[/] Only failed/cancelled tasks can be retried.", title="retry", border_style="yellow"))
+                    console.print(
+                        Panel(
+                            f"[yellow]Task not retryable (status: {status}).[/] Only failed/cancelled tasks can be retried.",
+                            title="retry",
+                            border_style="yellow",
+                        )
+                    )
                 else:
                     console.print(Panel(f"[red]No task with id '{task_id}'.[/]", title="retry", border_style="red"))
             else:
                 count = await ctx.task_queue.retry_all_failed()
                 if count > 0:
-                    console.print(Panel(f"[green]Reset {count} failed task(s) to pending.[/] Use [cyan]/run[/] to execute.", title="retry", border_style="green"))
+                    console.print(
+                        Panel(
+                            f"[green]Reset {count} failed task(s) to pending.[/] Use [cyan]/run[/] to execute.",
+                            title="retry",
+                            border_style="green",
+                        )
+                    )
                 else:
                     console.print(Panel("[dim]No failed tasks to retry.[/]", title="retry", border_style="dim"))
             continue
@@ -413,9 +474,9 @@ async def run_tui(ctx) -> None:
             initial = _watch_renderable(ctx, task_id)
             with Live(initial, refresh_per_second=4, console=console) as live:
 
-                async def _watch_update_loop() -> None:
+                async def _watch_update_loop(_task_id: str | None = task_id) -> None:
                     while True:
-                        live.update(_watch_renderable(ctx, task_id))
+                        live.update(_watch_renderable(ctx, _task_id))
                         await asyncio.sleep(0.25)
 
                 update_task = asyncio.create_task(_watch_update_loop())
@@ -423,22 +484,34 @@ async def run_tui(ctx) -> None:
                     await _ainput("\n[dim]Press Enter to close watch...[/] ")
                 finally:
                     update_task.cancel()
-                    try:
+                    with contextlib.suppress(asyncio.CancelledError):
                         await update_task
-                    except asyncio.CancelledError:
-                        pass
             continue
 
         if msg.strip() == "/trace":
             traces = getattr(ctx, "llm_traces", [])
             if not traces:
-                console.print(Panel("[dim]No LLM traces yet. Run /run to generate.[/]", title="[bold]trace[/bold]", border_style="dim"))
+                console.print(
+                    Panel(
+                        "[dim]No LLM traces yet. Run /run to generate.[/]",
+                        title="[bold]trace[/bold]",
+                        border_style="dim",
+                    )
+                )
             else:
                 entry = traces[-1]
                 kind = entry.get("kind", "?")
                 body = _format_llm_trace(entry, truncate=False)
-                console.print(Panel(body, title=f"[bold]last trace (full)[/] [magenta]{kind}[/]", border_style="magenta", padding=(0, 1)))
+                console.print(
+                    Panel(
+                        body,
+                        title=f"[bold]last trace (full)[/] [magenta]{kind}[/]",
+                        border_style="magenta",
+                        padding=(0, 1),
+                    )
+                )
                 from pathlib import Path
+
                 trace_file = Path(".agent_state/last_trace.txt")
                 trace_file.parent.mkdir(parents=True, exist_ok=True)
                 trace_file.write_text(
@@ -456,12 +529,27 @@ async def run_tui(ctx) -> None:
                 n = max(1, min(30, int(parts[1].strip())))
             show = traces[-n:] if traces else []
             if not show:
-                console.print(Panel("[dim]No LLM traces yet. Run /run (analyze, design, or implement) to generate.[/]", title="[bold]traces[/bold]", border_style="dim"))
+                console.print(
+                    Panel(
+                        "[dim]No LLM traces yet. Run /run (analyze, design, or implement) to generate.[/]",
+                        title="[bold]traces[/bold]",
+                        border_style="dim",
+                    )
+                )
             else:
                 for i, entry in enumerate(reversed(show)):
                     body = _format_llm_trace(entry, truncate=True)
-                    console.print(Panel(body, title=f"[bold]trace[/] {len(show) - i} ([magenta]{entry.get('kind', '?')}[/]) [dim]preview[/dim]", border_style="dim", padding=(0, 1)))
-                console.print("[dim]Use [cyan]/trace[/] for the last trace in full (and saved to .agent_state/last_trace.txt)[/]")
+                    console.print(
+                        Panel(
+                            body,
+                            title=f"[bold]trace[/] {len(show) - i} ([magenta]{entry.get('kind', '?')}[/]) [dim]preview[/dim]",
+                            border_style="dim",
+                            padding=(0, 1),
+                        )
+                    )
+                console.print(
+                    "[dim]Use [cyan]/trace[/] for the last trace in full (and saved to .agent_state/last_trace.txt)[/]"
+                )
             continue
 
         if msg.startswith("/parallel "):
@@ -476,7 +564,13 @@ async def run_tui(ctx) -> None:
         if msg == "/model":
             model_status = "[green]set[/]" if ctx.model else "[red]none[/]"
             limiter = ctx.model_limiter._sem._value if hasattr(ctx.model_limiter, "_sem") else "n/a"
-            console.print(Panel(f"model={model_status}  [dim]parallel slots=[/]{limiter}", title="[bold]model[/bold]", border_style="dim"))
+            console.print(
+                Panel(
+                    f"model={model_status}  [dim]parallel slots=[/]{limiter}",
+                    title="[bold]model[/bold]",
+                    border_style="dim",
+                )
+            )
             continue
 
         if msg.startswith("/plan "):
@@ -496,14 +590,28 @@ async def run_tui(ctx) -> None:
                     lines = t.result()
                     if lines and "planner failed" not in (lines[0] or ""):
                         console.print(_tasks_table(ctx))
-                        console.print(Panel("[green]Plan ready.[/] Use [cyan]/run[/] to start.", title="plan", border_style="green"))
+                        console.print(
+                            Panel(
+                                "[green]Plan ready.[/] Use [cyan]/run[/] to start.", title="plan", border_style="green"
+                            )
+                        )
                     else:
-                        console.print(Panel("\n".join(lines) if lines else "[dim]No tasks.[/]", title="plan", border_style="yellow"))
+                        console.print(
+                            Panel(
+                                "\n".join(lines) if lines else "[dim]No tasks.[/]", title="plan", border_style="yellow"
+                            )
+                        )
                 except Exception as e:
                     console.print(Panel(f"[red]{e}[/]", title="plan", border_style="red"))
 
             asyncio.create_task(plan_and_queue(ctx, goal)).add_done_callback(_on_plan_done_slash)
-            console.print(Panel(f"[dim]Planning in background:[/] {goal[:80]}{'…' if len(goal) > 80 else ''}\n[dim]/tasks when ready, then /run.[/]", title="plan", border_style="green"))
+            console.print(
+                Panel(
+                    f"[dim]Planning in background:[/] {goal[:80]}{'…' if len(goal) > 80 else ''}\n[dim]/tasks when ready, then /run.[/]",
+                    title="plan",
+                    border_style="green",
+                )
+            )
             continue
 
         if msg.startswith("/ask "):
@@ -512,24 +620,39 @@ async def run_tui(ctx) -> None:
                 console.print(Panel("usage: /ask <question>", title="ask", border_style="dim"))
                 continue
             if not ctx.model:
-                console.print(Panel("[red]No model set. Use --use-openai-chat-model.[/]", title="ask", border_style="red"))
+                console.print(
+                    Panel("[red]No model set. Use --use-openai-chat-model.[/]", title="ask", border_style="red")
+                )
                 continue
 
             async def _ask_background(q: str) -> None:
                 try:
                     from pydantic_ai import Agent
+
                     async with ctx.model_limiter:
                         agent = Agent(model=ctx.model)
                         result = await agent.run(q)
                     out = getattr(result, "output", None) or str(result)
-                    console.print(Panel(f"[dim]Q:[/] {q[:120]}{'…' if len(q) > 120 else ''}\n\n[green]{out}[/]", title="ask", border_style="cyan"))
+                    console.print(
+                        Panel(
+                            f"[dim]Q:[/] {q[:120]}{'…' if len(q) > 120 else ''}\n\n[green]{out}[/]",
+                            title="ask",
+                            border_style="cyan",
+                        )
+                    )
                 except asyncio.CancelledError:
                     console.print(Panel("[yellow]Ask cancelled.[/]", title="ask", border_style="yellow"))
                 except Exception as e:
                     console.print(Panel(f"[red]{e}[/]", title="ask", border_style="red"))
 
             asyncio.create_task(_ask_background(question))
-            console.print(Panel(f"[dim]Asking in background.[/] Answer will appear when ready. Keep typing — /tasks, /run, etc.[/]", title="ask", border_style="cyan"))
+            console.print(
+                Panel(
+                    "[dim]Asking in background.[/] Answer will appear when ready. Keep typing — /tasks, /run, etc.[/]",
+                    title="ask",
+                    border_style="cyan",
+                )
+            )
             continue
 
         if msg.startswith("/run"):
@@ -566,10 +689,8 @@ async def run_tui(ctx) -> None:
                             watch_out.pop(0)
 
                 def _on_background_done(t: asyncio.Task) -> None:
-                    try:
+                    with contextlib.suppress(ValueError):
                         ctx.background_run_tasks.remove(t)
-                    except ValueError:
-                        pass
                     if t.cancelled():
                         console.print(Panel("[yellow]Background run stopped.[/]", title="run", border_style="yellow"))
                         return
@@ -615,17 +736,19 @@ async def run_tui(ctx) -> None:
                 task = asyncio.create_task(run_n_tasks(ctx, count, progress_callback=_on_task_complete))
                 task.add_done_callback(_on_background_done)
                 ctx.background_run_tasks.append(task)
-                n_active = len([x for x in ctx.background_run_tasks if not x.done()])
-                console.print(Panel(
-                    f"[green]Run started[/] ({count} worker(s)) — task completions will stream below. [cyan]/status[/] [cyan]/traces[/] [cyan]/stop[/]",
-                    title="run",
-                    border_style="green",
-                ))
+                len([x for x in ctx.background_run_tasks if not x.done()])
+                console.print(
+                    Panel(
+                        f"[green]Run started[/] ({count} worker(s)) — task completions will stream below. [cyan]/status[/] [cyan]/traces[/] [cyan]/stop[/]",
+                        title="run",
+                        border_style="green",
+                    )
+                )
                 continue
 
             # Foreground (blocking): show Live spinner + trace
-            outs: List[str] = []
-            run_message: List[str] = ["Starting…"]
+            outs: list[str] = []
+            run_message: list[str] = ["Starting…"]
             run_spinner_panel = Panel(
                 _LiveSpinner(run_message, spinner_name=RUN_SPINNER),
                 title="[bold yellow] run [/]",
@@ -635,7 +758,7 @@ async def run_tui(ctx) -> None:
             live_renderable = Group(run_spinner_panel, _LiveTraceView(ctx))
 
             with Live(live_renderable, refresh_per_second=LIVE_REFRESH_PER_SECOND, console=console):
-                for i in range(max(1, count)):
+                for _i in range(max(1, count)):
                     next_t = ctx.task_queue.next_pending()
                     if next_t:
                         subagents_desc = TASK_SUBAGENTS.get(next_t.kind, "—")
@@ -660,7 +783,14 @@ async def run_tui(ctx) -> None:
             traces = getattr(ctx, "llm_traces", [])
             if traces:
                 last = traces[-1]
-                console.print(Panel(_format_llm_trace(last), title="[bold]last LLM trace[/] [dim](/traces for more)[/]", border_style="magenta", padding=(0, 1)))
+                console.print(
+                    Panel(
+                        _format_llm_trace(last),
+                        title="[bold]last LLM trace[/] [dim](/traces for more)[/]",
+                        border_style="magenta",
+                        padding=(0, 1),
+                    )
+                )
             console.print()
             console.print(Panel("\n\n".join(outs), title="[bold]run[/bold]", border_style="yellow"))
             continue
@@ -709,13 +839,13 @@ async def run_tui(ctx) -> None:
             ctx.workflow_experience.record(req, result, reward)
             ctx.workflow_planner.observe(req, wf.name, reward)
 
-            console.print(Panel(
-                f"ok={result.ok}\nworkflow={result.workflow_name}\nreward={reward:.3f}\noutputs={result.outputs}\ntrace={result.trace}",
-                title="execution"
-            ))
+            console.print(
+                Panel(
+                    f"ok={result.ok}\nworkflow={result.workflow_name}\nreward={reward:.3f}\noutputs={result.outputs}\ntrace={result.trace}",
+                    title="execution",
+                )
+            )
             continue
-
-
 
         # Plain chat message = queue plan in background (never block TUI; OpenCode/Claude Code style)
         goal = msg.strip()[:200]
@@ -733,21 +863,27 @@ async def run_tui(ctx) -> None:
                 lines = t.result()
                 if lines and "planner failed" not in (lines[0] or ""):
                     console.print(_tasks_table(ctx))
-                    console.print(Panel(
-                        "[green]Plan ready.[/] Use [cyan]/run[/] to start, or [cyan]/plan <goal>[/] for another.",
-                        title="plan",
-                        border_style="green",
-                    ))
+                    console.print(
+                        Panel(
+                            "[green]Plan ready.[/] Use [cyan]/run[/] to start, or [cyan]/plan <goal>[/] for another.",
+                            title="plan",
+                            border_style="green",
+                        )
+                    )
                 else:
-                    console.print(Panel("\n".join(lines) if lines else "[dim]No tasks.[/]", title="plan", border_style="yellow"))
+                    console.print(
+                        Panel("\n".join(lines) if lines else "[dim]No tasks.[/]", title="plan", border_style="yellow")
+                    )
             except Exception as e:
                 console.print(Panel(f"[red]{e}[/]", title="plan", border_style="red"))
 
         plan_task = asyncio.create_task(plan_and_queue(ctx, goal))
         plan_task.add_done_callback(_on_plan_done)
-        console.print(Panel(
-            f"[dim]Planning in background:[/] {goal}\n[dim]Keep typing — [/][cyan]/tasks[/] [dim]when ready, then [/][cyan]/run[/] [dim]. Run continues in parallel.[/]",
-            title="plan",
-            border_style="cyan",
-        ))
+        console.print(
+            Panel(
+                f"[dim]Planning in background:[/] {goal}\n[dim]Keep typing — [/][cyan]/tasks[/] [dim]when ready, then [/][cyan]/run[/] [dim]. Run continues in parallel.[/]",
+                title="plan",
+                border_style="cyan",
+            )
+        )
         continue

@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-from typing import Callable, List, Optional
+from collections.abc import Callable
 
 from agent_ext.research.models import ResearchPlan, ResearchTask
 
@@ -10,7 +10,7 @@ def default_plan(question: str) -> ResearchPlan:
     Deterministic starter plan. Good enough to run without an LLM.
     You can replace with an LLM planner later.
     """
-    tasks: List[ResearchTask] = [
+    tasks: list[ResearchTask] = [
         ResearchTask(
             id="t1_scope",
             kind="analyze",
@@ -53,7 +53,8 @@ class ResearchPlanner:
     Planner with an optional LLM-based planning seam:
     plan_fn(question) -> ResearchPlan
     """
-    def __init__(self, plan_fn: Optional[Callable[[str], ResearchPlan]] = None):
+
+    def __init__(self, plan_fn: Callable[[str], ResearchPlan] | None = None):
         self.plan_fn = plan_fn or default_plan
 
     def make_plan(self, question: str) -> ResearchPlan:

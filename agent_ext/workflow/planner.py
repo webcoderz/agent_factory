@@ -1,7 +1,5 @@
 from __future__ import annotations
 
-from typing import List
-
 from .bandit import UCB1Bandit
 from .experience import ExperienceStore
 from .types import TaskRequest, WorkflowSpec
@@ -16,7 +14,7 @@ class WorkflowPlanner:
         hints = ",".join(sorted(req.hints)) if req.hints else ""
         return f"{req.task_type}|{hints}"
 
-    def candidates(self, ctx, req: TaskRequest) -> List[str]:
+    def candidates(self, ctx, req: TaskRequest) -> list[str]:
         # Very simple matching rules to start; extend as needed
         names = ctx.workflow_registry.list_workflows()
         out = []

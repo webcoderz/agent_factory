@@ -3,11 +3,11 @@
 Fine-grained access control with presets (read-only, full-access, etc.)
 and pattern-based rules.
 """
+
 from __future__ import annotations
 
 import fnmatch
 from dataclasses import dataclass, field
-from enum import Enum
 from typing import Literal
 
 PermissionAction = Literal["allow", "deny", "ask"]
@@ -17,6 +17,7 @@ PermissionOperation = Literal["read", "write", "edit", "execute", "glob", "grep"
 @dataclass(frozen=True)
 class PermissionRule:
     """A rule matching paths/commands to an action.  First match wins."""
+
     pattern: str
     action: PermissionAction
     description: str = ""
@@ -25,6 +26,7 @@ class PermissionRule:
 @dataclass
 class OperationPermissions:
     """Permissions for a single operation type."""
+
     default: PermissionAction = "allow"
     rules: list[PermissionRule] = field(default_factory=list)
 
@@ -38,6 +40,7 @@ class OperationPermissions:
 @dataclass
 class PermissionRuleset:
     """Complete permissions configuration for all operations."""
+
     default: PermissionAction = "ask"
     read: OperationPermissions | None = None
     write: OperationPermissions | None = None
@@ -83,9 +86,17 @@ class PermissionChecker:
 # ---------------------------------------------------------------------------
 
 SECRETS_PATTERNS = [
-    "**/.env", "**/.env.*", "**/*.pem", "**/*.key", "**/*.crt",
-    "**/credentials*", "**/secrets*", "**/*secret*", "**/*password*",
-    "**/.aws/**", "**/.ssh/**",
+    "**/.env",
+    "**/.env.*",
+    "**/*.pem",
+    "**/*.key",
+    "**/*.crt",
+    "**/credentials*",
+    "**/secrets*",
+    "**/*secret*",
+    "**/*password*",
+    "**/.aws/**",
+    "**/.ssh/**",
 ]
 
 
@@ -155,6 +166,7 @@ def create_ruleset(
     deny_secrets: bool = True,
 ) -> PermissionRuleset:
     """Convenience factory for custom rulesets."""
+
     def _act(allowed: bool) -> PermissionAction:
         return "allow" if allowed else "ask"
 

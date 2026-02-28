@@ -1,2 +1,2 @@
-from .spec import ModuleSpec, ModuleState, ModuleProvides
 from .registry import ModuleRegistry
+from .spec import ModuleProvides, ModuleSpec, ModuleState

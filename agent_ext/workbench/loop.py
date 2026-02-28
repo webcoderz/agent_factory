@@ -2,10 +2,11 @@ from __future__ import annotations
 
 import asyncio
 import json
+import os
 import time
 from pathlib import Path
-from typing import Any, Dict, List, Optional
-import os
+from typing import Any
+
 from .subagents import SubagentResult
 
 # Optional: pydantic-ai for design/implement LLM steps
@@ -14,13 +15,14 @@ try:
 except ImportError:
     Agent = None  # type: ignore[misc, assignment]
 
-from agent_ext.workbench.worktrees import create_worktree, cleanup_worktree, worktree_diff
+import contextlib
+
+from agent_ext.cog.scoring import score_patch, touched_files_from_diff
 from agent_ext.self_improve.gates import run_gates
 from agent_ext.self_improve.models import GatePlan
 from agent_ext.self_improve.patching import apply_unified_diff
 from agent_ext.workbench.adopt import apply_diff_to_repo, commit_and_push
-from agent_ext.cog.scoring import score_patch, touched_files_from_diff
-from pathlib import Path
+from agent_ext.workbench.worktrees import cleanup_worktree, create_worktree, worktree_diff
 
 LLM_TRACE_MAX = 30
 # Store enough for debugging; trace is appended after full response (not streamed)
@@ -34,11 +36,13 @@ def _append_llm_trace(ctx, kind: str, prompt: str, response: str) -> None:
         return
     if len(traces) >= LLM_TRACE_MAX:
         traces.pop(0)
-    traces.append({
-        "kind": kind,
-        "prompt": (prompt or "")[:LLM_TRACE_PROMPT_LEN],
-        "response": (response or "")[:LLM_TRACE_RESPONSE_LEN],
-    })
+    traces.append(
+        {
+            "kind": kind,
+            "prompt": (prompt or "")[:LLM_TRACE_PROMPT_LEN],
+            "response": (response or "")[:LLM_TRACE_RESPONSE_LEN],
+        }
+    )
 
 
 async def _implement_in_worktree(
@@ -46,7 +50,7 @@ async def _implement_in_worktree(
     goal: str,
     candidates: list[dict],
     strategy: str | None = None,
-    task_id: Optional[str] = None,
+    task_id: str | None = None,
 ) -> str:
     """
     Lifecycle: (1) Create a temporary worktree (sandbox). (2) Apply LLM diff there, run gates.
@@ -72,12 +76,12 @@ async def _implement_in_worktree(
             ok_apply, out_apply = apply_unified_diff(raw_output, repo_root=wt.path)
         if not ok_apply:
             snippet = (raw_output[:800] + ("..." if len(raw_output) > 800 else "")) if raw_output else "(empty)"
-            reason = "model output not a raw diff (no diff --git or --- at start)" if not res.ok and not raw_output else out_apply or "no unified diff found in output"
-            return (
-                f"implement: create patch failed.\n"
-                f"Reason: {reason}\n"
-                f"Model output (first 800 chars):\n{snippet}"
+            reason = (
+                "model output not a raw diff (no diff --git or --- at start)"
+                if not res.ok and not raw_output
+                else out_apply or "no unified diff found in output"
             )
+            return f"implement: create patch failed.\nReason: {reason}\nModel output (first 800 chars):\n{snippet}"
 
         # 3) gates in worktree (compile/import; pytest optional)
         plan = GatePlan(import_check=True, compile_check=True, pytest_paths=[])
@@ -103,12 +107,14 @@ async def _implement_in_worktree(
         if hist.exists():
             data = json.loads(hist.read_text(encoding="utf-8"))
 
-        data["patches"].append({
-            "run_id": run_id,
-            "path": str(diff_path),
-            "gates_ok": gates.ok,
-            "diff_chars": len(diff),
-        })
+        data["patches"].append(
+            {
+                "run_id": run_id,
+                "path": str(diff_path),
+                "gates_ok": gates.ok,
+                "diff_chars": len(diff),
+            }
+        )
 
         hist.write_text(json.dumps(data, indent=2), encoding="utf-8")
         # --------------------------------------------
@@ -170,7 +176,8 @@ async def _implement_in_worktree(
             # Leave worktree in place; user can inspect or remove manually
             pass
 
-async def plan_and_queue(ctx, user_goal: str) -> List[str]:
+
+async def plan_and_queue(ctx, user_goal: str) -> list[str]:
     """
     Uses planner subagent to generate tasks, then enqueues them.
     """
@@ -212,7 +219,7 @@ async def run_next_task(ctx) -> str:
             calls = [
                 ("repo_grep", query, {"root": ".", "limit": 25, "regex": False}),
             ]
-            results: List[SubagentResult] = await ctx.orchestrator.run_many(
+            await ctx.orchestrator.run_many(
                 ctx,
                 calls,
                 max_concurrency=ctx.max_parallel_subagents,
@@ -224,8 +231,9 @@ async def run_next_task(ctx) -> str:
                 state["search_bm25_hits"] = bm.output
             t.status = "done"
             t.finished_at = time.time()
-            return f"{t.id} done: search\n- bm25: {len(bm.output)} hits\n  top: " + ", ".join([x["path"] for x in bm.output[:5]])
-
+            return f"{t.id} done: search\n- bm25: {len(bm.output)} hits\n  top: " + ", ".join(
+                [x["path"] for x in bm.output[:5]]
+            )
 
         if t.kind == "analyze":
             goal = str(t.input).strip()
@@ -273,7 +281,7 @@ async def run_next_task(ctx) -> str:
                 design_prompt = (
                     f"Goal: {goal}\n{spec}\n{files_ctx}\n\n"
                     "Output a short approach (2-3 sentences) then a JSON array of file changes. "
-                    "Format: {\"approach\": \"...\", \"changes\": [{\"path\": \"rel/path\", \"action\": \"edit\" or \"create\", \"description\": \"what to do\"}]}. "
+                    'Format: {"approach": "...", "changes": [{"path": "rel/path", "action": "edit" or "create", "description": "what to do"}]}. '
                     "Only include the JSON object, no markdown."
                 )
                 async with ctx.model_limiter:
@@ -347,11 +355,12 @@ async def run_next_task(ctx) -> str:
 
 def _run_worker(
     ctx,
-    results: List[str],
+    results: list[str],
     results_lock: asyncio.Lock,
-    progress_callback: Optional[Any] = None,
+    progress_callback: Any | None = None,
 ) -> None:
     """Single worker: repeatedly claim and run next task until queue empty (OpenCode-style parallel units of work)."""
+
     async def _run() -> None:
         while True:
             out = await run_next_task(ctx)
@@ -360,10 +369,8 @@ def _run_worker(
             async with results_lock:
                 results.append(out)
             if progress_callback is not None and callable(progress_callback):
-                try:
+                with contextlib.suppress(Exception):
                     progress_callback(out)
-                except Exception:
-                    pass
 
     return _run
 
@@ -372,12 +379,12 @@ async def run_n_tasks(
     ctx,
     n: int,
     *,
-    progress_callback: Optional[Any] = None,
-) -> List[str]:
+    progress_callback: Any | None = None,
+) -> list[str]:
     """Run with n concurrent workers until queue is empty. Each worker claims and runs tasks atomically (OpenCode-style).
     If progress_callback is set, it is called with each task output string as tasks complete (live stream, Cursor/Claude Code style)."""
     workers = max(1, n)
-    results: List[str] = []
+    results: list[str] = []
     results_lock = asyncio.Lock()
     worker_factory = _run_worker(ctx, results, results_lock, progress_callback)
     await asyncio.gather(*[worker_factory() for _ in range(workers)])

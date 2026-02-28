@@ -8,9 +8,11 @@ logging, or self-replicating agent frameworks.
 
 See: https://ai.pydantic.dev (run_stream, stream_text, agent.iter, graph nodes)
 """
+
 from __future__ import annotations
 
-from typing import Any, AsyncIterator, Dict, Optional, Tuple
+from collections.abc import AsyncIterator
+from typing import Any
 
 # Node type names matching pydantic-ai graph (agent.iter())
 NODE_USER_PROMPT = "user_prompt"
@@ -36,7 +38,7 @@ async def run_agent_streaming(
     (e.g. for custom subagents or tools that use Agent).
     """
     traces = getattr(ctx, "llm_traces", None)
-    trace_entry: Optional[Dict[str, Any]] = None
+    trace_entry: dict[str, Any] | None = None
     if traces is not None:
         max_traces = 30
         if len(traces) >= max_traces:
@@ -63,7 +65,7 @@ async def iter_agent_dag(
     agent: Any,
     prompt: str,
     **kwargs: Any,
-) -> AsyncIterator[Tuple[str, Any]]:
+) -> AsyncIterator[tuple[str, Any]]:
     """
     Iterate over the agent execution graph (DAG) node by node. Yields
     (node_type, node) for each step: user_prompt, model_request, call_tools, end.

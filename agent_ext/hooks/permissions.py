@@ -4,6 +4,7 @@ Instead of raising ``ToolBlocked`` or returning modified args,
 middleware can return a ``ToolPermissionResult`` with a structured decision:
 ALLOW, DENY, or ASK (defers to a ``PermissionHandler`` callback).
 """
+
 from __future__ import annotations
 
 from collections.abc import Awaitable

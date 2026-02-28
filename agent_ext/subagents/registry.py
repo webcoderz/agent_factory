@@ -3,27 +3,32 @@
 ``SubagentRegistry`` is the simple name→agent map (existing, preserved).
 ``DynamicAgentRegistry`` adds runtime creation limits, compiled agents, and summaries.
 """
+
 from __future__ import annotations
 
+import builtins
 from dataclasses import dataclass, field
-from typing import Any, Dict, List, Optional, Protocol
+from typing import Any, Protocol
 
 from .types import CompiledSubAgent, SubAgentConfig
-
 
 # ---------------------------------------------------------------------------
 # Protocol (what a subagent must look like)
 # ---------------------------------------------------------------------------
 
+
 class SubagentProtocol(Protocol):
     """Minimal subagent interface."""
+
     name: str
-    async def run(self, ctx: Any, *, input: Any, meta: Dict[str, Any]) -> Any: ...
+
+    async def run(self, ctx: Any, *, input: Any, meta: dict[str, Any]) -> Any: ...
 
 
 # ---------------------------------------------------------------------------
 # Static registry (backward-compat)
 # ---------------------------------------------------------------------------
+
 
 class SubagentRegistry:
     """Simple static registry: name → subagent.
@@ -32,7 +37,7 @@ class SubagentRegistry:
     """
 
     def __init__(self) -> None:
-        self._agents: Dict[str, Any] = {}
+        self._agents: dict[str, Any] = {}
 
     def register(self, agent: Any) -> None:
         self._agents[agent.name] = agent
@@ -42,7 +47,7 @@ class SubagentRegistry:
             raise KeyError(f"Unknown subagent: {name}")
         return self._agents[name]
 
-    def list(self) -> List[str]:
+    def list(self) -> builtins.list[str]:
         return sorted(self._agents.keys())
 
     def exists(self, name: str) -> bool:
@@ -55,6 +60,7 @@ class SubagentRegistry:
 # ---------------------------------------------------------------------------
 # Dynamic registry (parity with subagents-pydantic-ai)
 # ---------------------------------------------------------------------------
+
 
 @dataclass
 class DynamicAgentRegistry:
@@ -74,8 +80,7 @@ class DynamicAgentRegistry:
             raise ValueError(f"Agent '{name}' already exists")
         if self.max_agents and len(self.agents) >= self.max_agents:
             raise ValueError(
-                f"Maximum number of agents ({self.max_agents}) reached. "
-                f"Remove an agent before creating a new one."
+                f"Maximum number of agents ({self.max_agents}) reached. Remove an agent before creating a new one."
             )
         self.agents[name] = agent
         self.configs[name] = config

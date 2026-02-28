@@ -1,5 +1,6 @@
 import asyncio
 
+
 async def execute_tasks_parallel(ctx, ledger, tasks, handler_map, max_concurrency: int = 4):
     sem = asyncio.Semaphore(max_concurrency)
 

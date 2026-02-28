@@ -2,9 +2,10 @@
 
 Zero LLM cost, near-zero latency.  Preserves tool call/response pairs.
 """
+
 from __future__ import annotations
 
-from typing import Any, List
+from typing import Any
 
 from .base import MemoryManager
 from .cutoff import (
@@ -45,14 +46,12 @@ class SlidingWindowMemory(MemoryManager):
         self.trigger_messages = trigger_messages
         self.trigger_tokens = trigger_tokens
 
-    def _should_trim(self, messages: List[Any]) -> bool:
+    def _should_trim(self, messages: list[Any]) -> bool:
         """Check if trimming should happen."""
-        if self.trigger_tokens is not None:
-            if self.token_counter(messages) >= self.trigger_tokens:
-                return True
-        if self.trigger_messages is not None:
-            if len(messages) >= self.trigger_messages:
-                return True
+        if self.trigger_tokens is not None and self.token_counter(messages) >= self.trigger_tokens:
+            return True
+        if self.trigger_messages is not None and len(messages) >= self.trigger_messages:
+            return True
         # Default: trim when exceeding max
         if self.trigger_messages is None and self.trigger_tokens is None:
             if self.max_tokens is not None:
@@ -60,7 +59,7 @@ class SlidingWindowMemory(MemoryManager):
             return len(messages) > self.max_messages
         return False
 
-    def shape_messages(self, messages: List[Any]) -> List[Any]:
+    def shape_messages(self, messages: list[Any]) -> list[Any]:
         if not self._should_trim(messages):
             return messages
 
@@ -71,6 +70,6 @@ class SlidingWindowMemory(MemoryManager):
 
         return messages[cutoff:] if cutoff > 0 else messages
 
-    def checkpoint(self, messages: List[Any], *, outcome: Any) -> None:
+    def checkpoint(self, messages: list[Any], *, outcome: Any) -> None:
         # Sliding window doesn't checkpoint — no persistent state needed
         return None

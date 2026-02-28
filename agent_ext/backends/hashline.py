@@ -10,6 +10,7 @@ Format::
     2:f1|  return "world";
     3:0e|}
 """
+
 from __future__ import annotations
 
 import hashlib
@@ -93,7 +94,7 @@ def apply_hashline_edit(
     if insert_after:
         result_lines = lines[:start_line] + new_lines + lines[start_line:]
     else:
-        result_lines = lines[:start_line - 1] + new_lines + lines[effective_end:]
+        result_lines = lines[: start_line - 1] + new_lines + lines[effective_end:]
 
     result = "\n".join(result_lines)
     if has_trailing_nl:

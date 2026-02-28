@@ -3,13 +3,13 @@
 Files are stored in a dictionary and are ephemeral.  Useful for tests,
 preview environments, and stateless sandboxes.
 """
+
 from __future__ import annotations
 
 import fnmatch
 import re
-from dataclasses import dataclass, field
-from datetime import datetime, timezone
-from typing import Any
+from dataclasses import dataclass
+from datetime import UTC, datetime
 
 from .base import FilesystemBackend
 
@@ -86,7 +86,7 @@ class StateBackend(FilesystemBackend):
         return self._files
 
     def _ts(self) -> str:
-        return datetime.now(timezone.utc).isoformat()
+        return datetime.now(UTC).isoformat()
 
     # -- FilesystemBackend protocol -----------------------------------------
 
@@ -117,7 +117,7 @@ class StateBackend(FilesystemBackend):
         entries: set[str] = set()
         for fp in self._files:
             if fp.startswith(prefix):
-                rel = fp[len(prefix):]
+                rel = fp[len(prefix) :]
                 top = rel.split("/")[0]
                 entries.add(top)
         return sorted(entries)
@@ -157,10 +157,12 @@ class StateBackend(FilesystemBackend):
         content = "\n".join(fd.content)
         count = content.count(old_string)
         if count == 0:
-            return EditResult(error=f"String not found in file")
+            return EditResult(error="String not found in file")
         if count > 1 and not replace_all:
             return EditResult(error=f"String found {count} times. Use replace_all=True.")
-        new_content = content.replace(old_string, new_string) if replace_all else content.replace(old_string, new_string, 1)
+        new_content = (
+            content.replace(old_string, new_string) if replace_all else content.replace(old_string, new_string, 1)
+        )
         fd.content = new_content.split("\n")
         fd.modified_at = self._ts()
         return EditResult(path=p, occurrences=count if replace_all else 1)
@@ -190,7 +192,7 @@ class StateBackend(FilesystemBackend):
         for fp, fd in self._files.items():
             if not fp.startswith(prefix):
                 continue
-            rel = fp[len(prefix):]
+            rel = fp[len(prefix) :]
             parts = rel.split("/")
             name = parts[0]
             if name not in entries:

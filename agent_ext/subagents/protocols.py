@@ -3,12 +3,13 @@
 Define the interface that dependencies must implement to work with
 the subagent toolset.
 """
+
 from __future__ import annotations
 
-from typing import Any, Protocol, runtime_checkable
+from typing import Protocol, runtime_checkable
 
 from .message_bus import InMemoryMessageBus, TaskManager
-from .registry import DynamicAgentRegistry, SubagentRegistry
+from .registry import DynamicAgentRegistry
 from .types import CompiledSubAgent, SubAgentConfig
 
 

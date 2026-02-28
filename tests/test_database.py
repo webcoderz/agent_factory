@@ -1,14 +1,14 @@
 """Tests for the new database system."""
+
 from __future__ import annotations
 
-import asyncio
 import sqlite3
 import tempfile
 from pathlib import Path
 
 import pytest
 
-from agent_ext.database import SQLiteDatabase, DatabaseConfig, QueryResult, SchemaInfo, TableInfo
+from agent_ext.database import DatabaseConfig, SQLiteDatabase
 
 
 @pytest.fixture

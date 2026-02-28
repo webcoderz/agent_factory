@@ -1,19 +1,20 @@
 from __future__ import annotations
-from typing import List, Optional
 
 from agent_ext.run_context import RunContext
-from .models import DocumentInput, IngestResult
-from .pdf_to_images import PDFToImages
-from .ocr_engines import OCREngine
+
 from .extractors import PageExtractor
-from .validation import OCRValidator, OCRValidationPolicy
+from .models import DocumentInput, IngestResult
+from .ocr_engines import OCREngine
+from .pdf_to_images import PDFToImages
+from .validation import OCRValidator
 from .validation_evidence import ValidationEvidenceEmitter
+
 
 class IngestPipeline:
     def __init__(
         self,
         *,
-        pdf_to_images: Optional[PDFToImages],
+        pdf_to_images: PDFToImages | None,
         ocr_engine: OCREngine,
         extractor: PageExtractor,
         validator: OCRValidator | None = None,
@@ -45,11 +46,7 @@ class IngestPipeline:
             if self.fail_fast_on_validation:
                 report.raise_if_failed()
         # 3) Extract → Evidence
-        evidence = self.extractor.extract(
-            ctx, 
-            doc_artifact_id=doc_id, 
-            pages=ocr_pages
-            )
+        evidence = self.extractor.extract(ctx, doc_artifact_id=doc_id, pages=ocr_pages)
 
         return IngestResult(
             doc_artifact_id=doc_id,

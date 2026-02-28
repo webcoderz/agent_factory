@@ -2,24 +2,25 @@
 
 Covers messages, task handles, execution modes, and configuration.
 """
+
 from __future__ import annotations
 
 import uuid
-from collections.abc import Callable
 from dataclasses import dataclass, field
 from datetime import datetime
-from enum import Enum
-from typing import Any, Literal
+from enum import Enum, StrEnum
+from typing import Any, Literal, NotRequired
 
-from typing_extensions import NotRequired, TypedDict
-
+from typing_extensions import TypedDict
 
 # ---------------------------------------------------------------------------
 # Message types
 # ---------------------------------------------------------------------------
 
-class MessageType(str, Enum):
+
+class MessageType(StrEnum):
     """Types of messages between agents."""
+
     TASK_ASSIGNED = "task_assigned"
     TASK_UPDATE = "task_update"
     TASK_COMPLETED = "task_completed"
@@ -30,8 +31,9 @@ class MessageType(str, Enum):
     CANCEL_FORCED = "cancel_forced"
 
 
-class TaskStatus(str, Enum):
+class TaskStatus(StrEnum):
     """Status of a background task."""
+
     PENDING = "pending"
     RUNNING = "running"
     WAITING_FOR_ANSWER = "waiting_for_answer"
@@ -40,8 +42,9 @@ class TaskStatus(str, Enum):
     CANCELLED = "cancelled"
 
 
-class TaskPriority(str, Enum):
+class TaskPriority(StrEnum):
     """Priority levels for background tasks."""
+
     LOW = "low"
     NORMAL = "normal"
     HIGH = "high"
@@ -55,12 +58,14 @@ ExecutionMode = Literal["sync", "async", "auto"]
 # Task characteristics (for auto-mode selection)
 # ---------------------------------------------------------------------------
 
+
 @dataclass
 class TaskCharacteristics:
     """Characteristics that help decide sync vs async execution.
 
     Used by ``decide_execution_mode`` to auto-select.
     """
+
     estimated_complexity: Literal["simple", "moderate", "complex"] = "moderate"
     requires_user_context: bool = False
     is_time_sensitive: bool = False
@@ -98,12 +103,14 @@ def decide_execution_mode(
 # Configuration
 # ---------------------------------------------------------------------------
 
+
 class SubAgentConfig(TypedDict, total=False):
     """Configuration for a subagent.
 
     Required: name, description, instructions.
     Optional: model, toolsets, execution preferences, etc.
     """
+
     name: str
     description: str
     instructions: str
@@ -123,6 +130,7 @@ class SubAgentConfig(TypedDict, total=False):
 # Messages
 # ---------------------------------------------------------------------------
 
+
 def _generate_message_id() -> str:
     return uuid.uuid4().hex
 
@@ -130,6 +138,7 @@ def _generate_message_id() -> str:
 @dataclass
 class AgentMessage:
     """Message passed between agents via the message bus."""
+
     type: MessageType
     sender: str
     receiver: str
@@ -144,12 +153,14 @@ class AgentMessage:
 # Task handle
 # ---------------------------------------------------------------------------
 
+
 @dataclass
 class TaskHandle:
     """Handle for managing a background task.
 
     Returned when a task is started in async mode.
     """
+
     task_id: str
     subagent_name: str
     description: str
@@ -166,6 +177,7 @@ class TaskHandle:
 @dataclass
 class CompiledSubAgent:
     """A pre-compiled subagent ready for use."""
+
     name: str
     description: str
     config: SubAgentConfig

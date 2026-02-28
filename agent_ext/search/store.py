@@ -3,7 +3,7 @@ from __future__ import annotations
 import json
 from dataclasses import dataclass
 from pathlib import Path
-from typing import Any, Dict, Optional
+from typing import Any
 
 STATE_DIR = Path(".agent_state")
 REPO_INDEX_FILE = STATE_DIR / "repo_index.json"
@@ -40,7 +40,7 @@ class RepoFileMeta:
 @dataclass
 class RepoIndexState:
     version: str = "0.1.0"
-    files: Dict[str, Dict[str, Any]] = None  # path -> meta dict
+    files: dict[str, dict[str, Any]] = None  # path -> meta dict
 
     def __post_init__(self):
         if self.files is None:

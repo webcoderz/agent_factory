@@ -1,27 +1,30 @@
 """Skill models — specs, loaded skills, and programmatic creation."""
+
 from __future__ import annotations
 
 import hashlib
-from typing import Any, Dict, List, Optional
+from typing import Any
 
 from pydantic import BaseModel, Field
 
 
 class SkillSpec(BaseModel):
     """Metadata for a discoverable skill."""
+
     id: str
     name: str
     description: str
-    tags: List[str] = Field(default_factory=list)
+    tags: list[str] = Field(default_factory=list)
     version: str = "0.1.0"
-    path: Optional[str] = None              # where SKILL.md lives
-    required_perms: List[str] = Field(default_factory=list)
-    tool_bundle: Optional[str] = None       # optional name → tools enabled when active
-    metadata: Dict[str, Any] = Field(default_factory=dict)
+    path: str | None = None  # where SKILL.md lives
+    required_perms: list[str] = Field(default_factory=list)
+    tool_bundle: str | None = None  # optional name → tools enabled when active
+    metadata: dict[str, Any] = Field(default_factory=dict)
 
 
 class LoadedSkill(BaseModel):
     """A skill with its body loaded into memory."""
+
     spec: SkillSpec
     body_markdown: str
     body_hash: str
@@ -33,11 +36,11 @@ def create_skill(
     name: str,
     description: str,
     body: str,
-    tags: List[str] | None = None,
+    tags: list[str] | None = None,
     version: str = "0.1.0",
-    required_perms: List[str] | None = None,
+    required_perms: list[str] | None = None,
     tool_bundle: str | None = None,
-    metadata: Dict[str, Any] | None = None,
+    metadata: dict[str, Any] | None = None,
 ) -> LoadedSkill:
     """Programmatically create a skill (no filesystem needed).
 

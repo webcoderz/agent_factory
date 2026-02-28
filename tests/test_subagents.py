@@ -1,15 +1,18 @@
 """Tests for the overhauled subagents system."""
+
 from __future__ import annotations
 
-import asyncio
 import pytest
 
 from agent_ext.subagents import (
-    SubagentRegistry, DynamicAgentRegistry,
-    InMemoryMessageBus, TaskManager, create_message_bus,
-    AgentMessage, MessageType, TaskHandle, TaskStatus, TaskPriority,
-    SubAgentConfig, TaskCharacteristics, decide_execution_mode,
-    CompiledSubAgent,
+    AgentMessage,
+    DynamicAgentRegistry,
+    InMemoryMessageBus,
+    MessageType,
+    SubAgentConfig,
+    SubagentRegistry,
+    TaskCharacteristics,
+    decide_execution_mode,
 )
 
 
@@ -17,6 +20,7 @@ class TestSubagentRegistry:
     def test_register_and_get(self):
         class FakeAgent:
             name = "test"
+
         reg = SubagentRegistry()
         reg.register(FakeAgent())
         assert reg.get("test").name == "test"
@@ -29,8 +33,10 @@ class TestSubagentRegistry:
     def test_list_and_count(self):
         class A:
             name = "a"
+
         class B:
             name = "b"
+
         reg = SubagentRegistry()
         reg.register(A())
         reg.register(B())
@@ -92,10 +98,13 @@ class TestMessageBus:
     @pytest.mark.asyncio
     async def test_send_and_receive(self):
         bus = InMemoryMessageBus()
-        queue = bus.register_agent("worker")
+        bus.register_agent("worker")
         msg = AgentMessage(
-            type=MessageType.TASK_ASSIGNED, sender="parent",
-            receiver="worker", payload="do something", task_id="t1",
+            type=MessageType.TASK_ASSIGNED,
+            sender="parent",
+            receiver="worker",
+            payload="do something",
+            task_id="t1",
         )
         await bus.send(msg)
         messages = await bus.get_messages("worker")
@@ -106,8 +115,11 @@ class TestMessageBus:
     async def test_send_to_unregistered_raises(self):
         bus = InMemoryMessageBus()
         msg = AgentMessage(
-            type=MessageType.TASK_ASSIGNED, sender="parent",
-            receiver="nobody", payload="x", task_id="t1",
+            type=MessageType.TASK_ASSIGNED,
+            sender="parent",
+            receiver="nobody",
+            payload="x",
+            task_id="t1",
         )
         with pytest.raises(KeyError):
             await bus.send(msg)

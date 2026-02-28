@@ -1,11 +1,10 @@
 """Tests for agent_ext.workbench.planner — TaskQueue."""
-from __future__ import annotations
 
-import asyncio
+from __future__ import annotations
 
 import pytest
 
-from agent_ext.workbench.planner import Task, TaskQueue
+from agent_ext.workbench.planner import TaskQueue
 
 
 class TestTaskQueue:
@@ -115,6 +114,7 @@ class TestTaskQueue:
 
     def test_elapsed_time(self):
         import time
+
         q = TaskQueue()
         t = q.add("search", "A", "q1")
         assert t.elapsed_s is None  # not started

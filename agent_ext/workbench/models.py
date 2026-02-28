@@ -2,7 +2,7 @@ from __future__ import annotations
 
 import os
 from dataclasses import dataclass
-from typing import Any, Optional
+from typing import Any
 
 
 @dataclass
@@ -33,9 +33,7 @@ def build_openai_chat_model(cfg: ModelConfig) -> Any:
     try:
         from pydantic_ai.models.openai import OpenAIChatModel
         from pydantic_ai.providers.openai import OpenAIProvider
-    except ImportError:
-        raise RuntimeError(
-            "pydantic-ai not installed. Install agent-patterns[agent] or pydantic-ai."
-        )
+    except ImportError as e:
+        raise RuntimeError("pydantic-ai not installed. Install agent-patterns[agent] or pydantic-ai.") from e
     provider = OpenAIProvider(base_url=cfg.base_url, api_key=cfg.api_key)
     return OpenAIChatModel(cfg.model, provider=provider)

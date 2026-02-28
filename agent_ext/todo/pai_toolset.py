@@ -12,6 +12,7 @@ Example::
     deps = TodoDeps(store=store, case_id="case-1")
     result = await agent.run("Create a task to review the PR", deps=deps)
 """
+
 from __future__ import annotations
 
 from typing import Annotated, Any
@@ -20,8 +21,7 @@ from pydantic import BaseModel, ConfigDict, SkipValidation
 from pydantic_ai import RunContext
 from pydantic_ai.toolsets import FunctionToolset
 
-from .models import Task, TaskCreate, TaskPatch, TaskQuery, TaskStatus
-from .store_base import TaskStore
+from .models import TaskCreate, TaskPatch, TaskQuery
 
 TODO_SYSTEM_PROMPT = """
 ## Todo Tools
@@ -36,6 +36,7 @@ You can manage tasks using the following tools:
 
 class TodoDeps(BaseModel):
     """Dependencies for the todo toolset."""
+
     model_config = ConfigDict(arbitrary_types_allowed=True)
 
     store: Annotated[Any, SkipValidation]  # TaskStore

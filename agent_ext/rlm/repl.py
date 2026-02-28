@@ -12,6 +12,7 @@ Key features:
 - Persistent local state across executions
 - stdout/stderr capture with truncation
 """
+
 from __future__ import annotations
 
 import io
@@ -23,11 +24,10 @@ import tempfile
 import textwrap
 import threading
 import time
-from contextlib import contextmanager
-from dataclasses import dataclass
+from contextlib import contextmanager, suppress
 from typing import Any, ClassVar
 
-from .models import ContextType, RLMConfig, REPLResult
+from .models import ContextType, REPLResult, RLMConfig
 
 
 class REPLEnvironment:
@@ -35,44 +35,94 @@ class REPLEnvironment:
 
     SAFE_BUILTINS: ClassVar[dict[str, Any]] = {
         # Core types
-        "print": print, "len": len, "str": str, "int": int, "float": float,
-        "bool": bool, "list": list, "dict": dict, "set": set, "tuple": tuple,
-        "type": type, "isinstance": isinstance, "issubclass": issubclass,
+        "print": print,
+        "len": len,
+        "str": str,
+        "int": int,
+        "float": float,
+        "bool": bool,
+        "list": list,
+        "dict": dict,
+        "set": set,
+        "tuple": tuple,
+        "type": type,
+        "isinstance": isinstance,
+        "issubclass": issubclass,
         # Iteration
-        "range": range, "enumerate": enumerate, "zip": zip, "map": map,
-        "filter": filter, "sorted": sorted, "reversed": reversed,
-        "iter": iter, "next": next,
+        "range": range,
+        "enumerate": enumerate,
+        "zip": zip,
+        "map": map,
+        "filter": filter,
+        "sorted": sorted,
+        "reversed": reversed,
+        "iter": iter,
+        "next": next,
         # Math
-        "min": min, "max": max, "sum": sum, "abs": abs, "round": round,
-        "pow": pow, "divmod": divmod,
+        "min": min,
+        "max": max,
+        "sum": sum,
+        "abs": abs,
+        "round": round,
+        "pow": pow,
+        "divmod": divmod,
         # String / char
-        "chr": chr, "ord": ord, "hex": hex, "bin": bin, "oct": oct,
-        "repr": repr, "ascii": ascii, "format": format,
+        "chr": chr,
+        "ord": ord,
+        "hex": hex,
+        "bin": bin,
+        "oct": oct,
+        "repr": repr,
+        "ascii": ascii,
+        "format": format,
         # Collections
-        "any": any, "all": all, "slice": slice, "hash": hash, "id": id,
+        "any": any,
+        "all": all,
+        "slice": slice,
+        "hash": hash,
+        "id": id,
         "callable": callable,
         # Attribute access
-        "hasattr": hasattr, "getattr": getattr, "setattr": setattr,
-        "delattr": delattr, "dir": dir, "vars": vars,
+        "hasattr": hasattr,
+        "getattr": getattr,
+        "setattr": setattr,
+        "delattr": delattr,
+        "dir": dir,
+        "vars": vars,
         # Binary
-        "bytes": bytes, "bytearray": bytearray, "memoryview": memoryview,
+        "bytes": bytes,
+        "bytearray": bytearray,
+        "memoryview": memoryview,
         "complex": complex,
         # OOP
-        "super": super, "property": property, "staticmethod": staticmethod,
-        "classmethod": classmethod, "object": object,
+        "super": super,
+        "property": property,
+        "staticmethod": staticmethod,
+        "classmethod": classmethod,
+        "object": object,
         # Exceptions
-        "Exception": Exception, "ValueError": ValueError, "TypeError": TypeError,
-        "KeyError": KeyError, "IndexError": IndexError, "AttributeError": AttributeError,
-        "RuntimeError": RuntimeError, "StopIteration": StopIteration,
+        "Exception": Exception,
+        "ValueError": ValueError,
+        "TypeError": TypeError,
+        "KeyError": KeyError,
+        "IndexError": IndexError,
+        "AttributeError": AttributeError,
+        "RuntimeError": RuntimeError,
+        "StopIteration": StopIteration,
         "NotImplementedError": NotImplementedError,
         # File access (sandboxed to temp dir)
-        "open": open, "FileNotFoundError": FileNotFoundError,
+        "open": open,
+        "FileNotFoundError": FileNotFoundError,
         "OSError": OSError,
     }
 
     BLOCKED_BUILTINS: ClassVar[dict[str, None]] = {
-        "eval": None, "exec": None, "compile": None,
-        "globals": None, "locals": None, "input": None,
+        "eval": None,
+        "exec": None,
+        "compile": None,
+        "globals": None,
+        "locals": None,
+        "input": None,
         "__builtins__": None,
     }
 
@@ -135,7 +185,9 @@ class REPLEnvironment:
             ctx_path = os.path.join(self.temp_dir, "context.json")
             with open(ctx_path, "w", encoding="utf-8") as f:
                 json.dump(context, f, indent=2, default=str)
-            load_code = f"import json\nwith open(r'{ctx_path}', 'r', encoding='utf-8') as f:\n    context = json.load(f)\n"
+            load_code = (
+                f"import json\nwith open(r'{ctx_path}', 'r', encoding='utf-8') as f:\n    context = json.load(f)\n"
+            )
         self._execute_internal(load_code)
 
     def _execute_internal(self, code: str) -> None:
@@ -166,7 +218,9 @@ class REPLEnvironment:
             try:
                 # Split imports from other code
                 lines = code.split("\n")
-                import_lines = [l for l in lines if l.strip().startswith(("import ", "from ")) and not l.strip().startswith("#")]
+                import_lines = [
+                    l for l in lines if l.strip().startswith(("import ", "from ")) and not l.strip().startswith("#")
+                ]
                 other_lines = [l for l in lines if l not in import_lines]
 
                 if import_lines:
@@ -195,16 +249,17 @@ class REPLEnvironment:
             stderr_content = stderr_content[:max_chars] + "\n… (truncated)"
 
         return REPLResult(
-            stdout=stdout_content, stderr=stderr_content,
-            locals=dict(self.locals), execution_time=dt, success=success,
+            stdout=stdout_content,
+            stderr=stderr_content,
+            locals=dict(self.locals),
+            execution_time=dt,
+            success=success,
         )
 
     def cleanup(self) -> None:
         """Clean up temporary directory."""
-        try:
+        with suppress(Exception):
             shutil.rmtree(self.temp_dir, ignore_errors=True)
-        except Exception:
-            pass
 
 
 def format_repl_result(result: REPLResult, max_var_display: int = 200) -> str:
@@ -214,8 +269,9 @@ def format_repl_result(result: REPLResult, max_var_display: int = 200) -> str:
         parts.append(f"Output:\n{result.stdout}")
     if result.stderr.strip():
         parts.append(f"Errors:\n{result.stderr}")
-    user_vars = {k: v for k, v in result.locals.items()
-                 if not k.startswith("_") and k not in ("context", "json", "re", "os")}
+    user_vars = {
+        k: v for k, v in result.locals.items() if not k.startswith("_") and k not in ("context", "json", "re", "os")
+    }
     if user_vars:
         var_lines = []
         for name, value in user_vars.items():

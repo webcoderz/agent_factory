@@ -1,4 +1,5 @@
 from __future__ import annotations
+
 import glob
 import os
 
@@ -18,7 +19,7 @@ class LocalFilesystemBackend(FilesystemBackend):
 
     def read_text(self, path: str) -> str:
         ap = self._resolve(path)
-        with open(ap, "r", encoding="utf-8") as f:
+        with open(ap, encoding="utf-8") as f:
             return f.read()
 
     def write_text(self, path: str, content: str) -> None:

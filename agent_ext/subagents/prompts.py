@@ -3,6 +3,7 @@
 Contains prompts that configure subagents and explain task delegation
 to the parent agent.
 """
+
 from __future__ import annotations
 
 from typing import TYPE_CHECKING

@@ -1,30 +1,31 @@
 from __future__ import annotations
 
-from pathlib import Path
-from typing import Any, Optional
-
-import os
 import asyncio
-from agent_ext.mcp import MCPToolRegistry, LocalTransport, MCPServer, MCPClient, ToolSpec
-from agent_ext.run_context import RunContext, Policy
+import contextlib
+import os
+from pathlib import Path
+from typing import Any
+
+from agent_ext.cog.state import CogState, RegressionMemory
+from agent_ext.hooks.builtins import AuditHook, PolicyHook
+from agent_ext.hooks.chain import MiddlewareChain
+from agent_ext.hooks.context import MiddlewareContext
+from agent_ext.mcp import LocalTransport, MCPClient, MCPServer, MCPToolRegistry, ToolSpec
+from agent_ext.modules.registry import ModuleRegistry
+from agent_ext.run_context import Policy, RunContext
+from agent_ext.search import BM25Config, BM25Index, RepoIndexerConfig, TokenizerConfig
+from agent_ext.subagents.message_bus import InMemoryMessageBus, TaskManager
+from agent_ext.workbench.subagents_bm25 import BM25SearchSubagent
+from agent_ext.workflow.builtins import register_builtins as register_workflow_builtins
+from agent_ext.workflow.executor import WorkflowExecutor
+from agent_ext.workflow.experience import ExperienceStore
+from agent_ext.workflow.planner import WorkflowPlanner
+from agent_ext.workflow.registry import Registry as WorkflowRegistry
 
 from .limits import ModelLimiter
 from .planner import TaskQueue
-from .subagents import SubagentOrchestrator, SubagentRegistry, RepoGrepSubagent, PlannerSubagent
+from .subagents import PlannerSubagent, RepoGrepSubagent, SubagentOrchestrator, SubagentRegistry
 from .subagents_patch import LLMPatchSubagent
-from agent_ext.hooks.chain import MiddlewareChain
-from agent_ext.hooks.builtins import AuditHook, PolicyHook
-from agent_ext.hooks.context import MiddlewareContext
-from agent_ext.subagents.message_bus import InMemoryMessageBus, TaskManager
-from agent_ext.modules.registry import ModuleRegistry
-from agent_ext.workflow.registry import Registry as WorkflowRegistry
-from agent_ext.workflow.builtins import register_builtins as register_workflow_builtins
-from agent_ext.workflow.experience import ExperienceStore
-from agent_ext.workflow.planner import WorkflowPlanner
-from agent_ext.workflow.executor import WorkflowExecutor
-from agent_ext.search import BM25Index, BM25Config, TokenizerConfig, RepoIndexerConfig
-from agent_ext.workbench.subagents_bm25 import BM25SearchSubagent
-from agent_ext.cog.state import CogState, RegressionMemory
 
 try:
     from agent_ext.self_improve.controller import SelfImproveController
@@ -34,22 +35,33 @@ except Exception:
 use_tiktoken = bool(int(os.getenv("USE_TIKTOKEN", "0")))
 tok_enc = os.getenv("TIKTOKEN_ENCODING", "o200k_base")
 
+
 class _Logger:
-    def info(self, msg: str, **kw): print(f"[info] {msg} {kw}")
-    def warning(self, msg: str, **kw): print(f"[warn] {msg} {kw}")
-    def error(self, msg: str, **kw): print(f"[error] {msg} {kw}")
+    def info(self, msg: str, **kw):
+        print(f"[info] {msg} {kw}")
+
+    def warning(self, msg: str, **kw):
+        print(f"[warn] {msg} {kw}")
+
+    def error(self, msg: str, **kw):
+        print(f"[error] {msg} {kw}")
 
 
 class _Cache(dict):
-    def get(self, k, default=None): return super().get(k, default)
-    def set(self, k, v): super().__setitem__(k, v)
+    def get(self, k, default=None):
+        return super().get(k, default)
+
+    def set(self, k, v):
+        super().__setitem__(k, v)
 
 
 class _Artifacts:
     root = Path(".agent_state/runs")
+
     def put_json(self, key: str, obj):
         self.root.mkdir(parents=True, exist_ok=True)
         import json
+
         p = self.root / f"{key}.json"
         p.write_text(json.dumps(obj, indent=2), encoding="utf-8")
         return str(p)
@@ -60,7 +72,7 @@ def build_ctx(
     case_id: str = "case-1",
     session_id: str = "sess-1",
     user_id: str = "user-1",
-    model: Optional[Any] = None,
+    model: Any | None = None,
     max_parallel_subagents: int = 4,
     max_parallel_model_calls: int = 2,
 ) -> RunContext:
@@ -99,20 +111,20 @@ def build_ctx(
     ctx.orchestrator = SubagentOrchestrator(reg)
     # Middleware chain (async hooks)
     ctx.middleware_chain = MiddlewareChain([AuditHook(), PolicyHook()])
-    ctx.middleware_context = MiddlewareContext(config={
-        "case_id": case_id,
-        "session_id": session_id,
-        "max_parallel_subagents": max_parallel_subagents,
-    })
+    ctx.middleware_context = MiddlewareContext(
+        config={
+            "case_id": case_id,
+            "session_id": session_id,
+            "max_parallel_subagents": max_parallel_subagents,
+        }
+    )
     # Message bus for inter-agent communication
     ctx.message_bus = InMemoryMessageBus()
     ctx.task_manager = TaskManager(message_bus=ctx.message_bus)
     # Module registry (load builtins)
     ctx.module_registry = ModuleRegistry()
-    try:
-        ctx.module_registry.load_all_builtins(ctx)
-    except Exception:
-        pass  # non-fatal if modules fail to load
+    with contextlib.suppress(Exception):
+        ctx.module_registry.load_all_builtins(ctx)  # non-fatal if modules fail to load
     # Commands map (TUI)
     ctx.commands = {}
     # Run state for plan → design → implement (search results, design output, etc.)

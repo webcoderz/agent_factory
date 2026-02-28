@@ -14,6 +14,7 @@ Example::
     deps = ConsoleDeps(backend=backend)
     result = await agent.run("List files in the src directory", deps=deps)
 """
+
 from __future__ import annotations
 
 import subprocess
@@ -23,7 +24,7 @@ from pydantic import BaseModel, ConfigDict, SkipValidation
 from pydantic_ai import RunContext
 from pydantic_ai.toolsets import FunctionToolset
 
-from .permissions import PermissionChecker, PERMISSIVE_RULESET, PermissionRuleset
+from .permissions import PERMISSIVE_RULESET, PermissionChecker, PermissionRuleset
 
 CONSOLE_SYSTEM_PROMPT = """\
 ## Console Tools
@@ -36,6 +37,7 @@ detailed usage guidance.
 
 class ConsoleDeps(BaseModel):
     """Dependencies for the console toolset."""
+
     model_config = ConfigDict(arbitrary_types_allowed=True)
 
     backend: Annotated[Any, SkipValidation]  # FilesystemBackend
@@ -90,7 +92,9 @@ def create_console_toolset(*, toolset_id: str | None = None) -> FunctionToolset[
         except Exception as e:
             return f"Error: {e}"
 
-    @toolset.tool(description="Write content to a file. Creates the file if it doesn't exist. Prefer edit_file for existing files.")
+    @toolset.tool(
+        description="Write content to a file. Creates the file if it doesn't exist. Prefer edit_file for existing files."
+    )
     async def write_file(ctx: RunContext[ConsoleDeps], path: str, content: str) -> str:
         err = _check(ctx, "write", path)
         if err:
@@ -101,7 +105,9 @@ def create_console_toolset(*, toolset_id: str | None = None) -> FunctionToolset[
         except Exception as e:
             return f"Error: {e}"
 
-    @toolset.tool(description="Edit a file by replacing an exact string. ALWAYS read_file first. Use replace_all=True for renaming.")
+    @toolset.tool(
+        description="Edit a file by replacing an exact string. ALWAYS read_file first. Use replace_all=True for renaming."
+    )
     async def edit_file(
         ctx: RunContext[ConsoleDeps],
         path: str,
@@ -135,6 +141,7 @@ def create_console_toolset(*, toolset_id: str | None = None) -> FunctionToolset[
             return err
         try:
             import re
+
             results: list[str] = []
             for fp in ctx.deps.backend.glob("**/*.py"):
                 try:
@@ -170,7 +177,10 @@ def create_console_toolset(*, toolset_id: str | None = None) -> FunctionToolset[
             return err
         try:
             p = subprocess.run(
-                command, shell=True, capture_output=True, text=True,
+                command,
+                shell=True,
+                capture_output=True,
+                text=True,
                 timeout=ctx.deps.exec_timeout,
             )
             output = (p.stdout or "") + (p.stderr or "")

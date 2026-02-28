@@ -2,6 +2,7 @@
 Structured patch output for the LLM: Pydantic models that the model returns
 so we can convert to a valid unified diff ourselves (no raw diff parsing).
 """
+
 from __future__ import annotations
 
 from typing import Literal
@@ -23,7 +24,9 @@ class FilePatch(BaseModel):
 
     path: str = Field(description="Relative path from repo root, e.g. agent_ext/foo.py")
     is_new_file: bool = Field(default=False, description="True if this file is being created")
-    lines: list[LineChange] = Field(default_factory=list, description="Ordered list of line changes (context/add/remove)")
+    lines: list[LineChange] = Field(
+        default_factory=list, description="Ordered list of line changes (context/add/remove)"
+    )
 
 
 class PatchOutput(BaseModel):

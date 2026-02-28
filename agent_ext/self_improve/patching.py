@@ -3,7 +3,6 @@ from __future__ import annotations
 import re
 import subprocess
 from pathlib import Path
-import sys
 
 
 def _extract_diff_from_lines(lines: list[str]) -> str:
@@ -17,23 +16,19 @@ def _extract_diff_from_lines(lines: list[str]) -> str:
         return ""
 
     def is_diff_line(ln: str) -> bool:
-        if ln.startswith("--- ") or ln.startswith("+++ ") or ln.startswith("diff --git "):
-            return True
-        # Valid: @@ -1,3 +1,4 @@  ; LLM sometimes outputs bare @@ (we repair later)
-        if ln.startswith("@@"):
-            return True
-        if len(ln) >= 1 and ln[0] == " ":  # context line (must have leading space)
-            return True
-        if len(ln) >= 1 and ln[0] == "+" and not ln.startswith("+++ "):  # added line
-            return True
-        if len(ln) >= 1 and ln[0] == "-" and not ln.startswith("--- "):  # removed line
-            return True
-        # Git diff header lines (between "diff --git" and "---"/"+++")
-        if ln.startswith("index ") or ln.startswith("new file mode ") or ln.startswith("old mode ") or ln.startswith("deleted file mode "):
-            return True
-        # Empty lines are NOT valid diff lines by themselves;
-        # context lines in a diff have a leading space character.
-        return False
+        return (
+            ln.startswith("--- ")
+            or ln.startswith("+++ ")
+            or ln.startswith("diff --git ")
+            or ln.startswith("@@")  # Valid: @@ -1,3 +1,4 @@  ; LLM sometimes outputs bare @@ (we repair later)
+            or (len(ln) >= 1 and ln[0] == " ")  # context line (must have leading space)
+            or (len(ln) >= 1 and ln[0] == "+" and not ln.startswith("+++ "))  # added line
+            or (len(ln) >= 1 and ln[0] == "-" and not ln.startswith("--- "))  # removed line
+            or ln.startswith("index ")
+            or ln.startswith("new file mode ")
+            or ln.startswith("old mode ")
+            or ln.startswith("deleted file mode ")
+        )
 
     end = start
     for i in range(start, len(lines)):
@@ -80,7 +75,9 @@ def _repair_hunk_headers(diff: str) -> str:
         # Malformed: collect hunk body and build valid header
         n_old = n_new = 0
         j = i + 1
-        while j < len(lines) and not (lines[j].startswith("@@") or lines[j].startswith("diff --git") or lines[j].startswith("--- ")):
+        while j < len(lines) and not (
+            lines[j].startswith("@@") or lines[j].startswith("diff --git") or lines[j].startswith("--- ")
+        ):
             ln = lines[j]
             if ln.startswith("-") and not ln.startswith("--- "):
                 n_old += 1
@@ -195,9 +192,15 @@ def apply_unified_diff(diff_text: str, repo_root: Path = Path(".")) -> tuple[boo
     """
     cleaned = sanitize_diff_for_apply(diff_text)
     if not cleaned.strip():
-        return False, "sanitize_diff: no unified diff found in output (LLM must output raw diff: ---/+++ headers, @@ hunks, no markdown)"
+        return (
+            False,
+            "sanitize_diff: no unified diff found in output (LLM must output raw diff: ---/+++ headers, @@ hunks, no markdown)",
+        )
     if "@@" not in cleaned:
-        return False, "sanitize_diff: no valid hunks (unified diff must contain @@ hunk headers; LLM may have returned prose instead of a diff)"
+        return (
+            False,
+            "sanitize_diff: no valid hunks (unified diff must contain @@ hunk headers; LLM may have returned prose instead of a diff)",
+        )
     p = subprocess.run(
         ["git", "apply", "--whitespace=nowarn", "-"],
         input=cleaned,

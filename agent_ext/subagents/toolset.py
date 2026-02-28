@@ -10,6 +10,7 @@ Example::
     toolset = create_subagent_toolset(configs=[...])
     agent = Agent("openai:gpt-4o", toolsets=[toolset])
 """
+
 from __future__ import annotations
 
 import asyncio
@@ -21,31 +22,25 @@ from pydantic import BaseModel, ConfigDict, SkipValidation
 from pydantic_ai import Agent, RunContext
 from pydantic_ai.toolsets import FunctionToolset
 
-from .message_bus import InMemoryMessageBus, TaskManager
 from .prompts import (
-    TASK_TOOL_DESCRIPTION,
     CHECK_TASK_DESCRIPTION,
     LIST_ACTIVE_TASKS_DESCRIPTION,
     SOFT_CANCEL_TASK_DESCRIPTION,
-    SUBAGENT_SYSTEM_PROMPT,
+    TASK_TOOL_DESCRIPTION,
     get_task_instructions_prompt,
 )
 from .types import (
-    AgentMessage,
     CompiledSubAgent,
-    ExecutionMode,
-    MessageType,
     SubAgentConfig,
     TaskCharacteristics,
     TaskHandle,
-    TaskPriority,
     TaskStatus,
-    decide_execution_mode,
 )
 
 
 class SubAgentDeps(BaseModel):
     """Dependencies for the subagent toolset."""
+
     model_config = ConfigDict(arbitrary_types_allowed=True)
 
     configs: list[Annotated[Any, SkipValidation]] = []
@@ -111,9 +106,7 @@ def create_subagent_toolset(
             description: Task description with all necessary context.
             mode: Execution mode: "sync", "async", or "auto".
         """
-        compiled = _compiled.get(subagent_type) or (
-            ctx.deps.compiled_agents.get(subagent_type)
-        )
+        compiled = _compiled.get(subagent_type) or (ctx.deps.compiled_agents.get(subagent_type))
         if not compiled or not compiled.agent:
             available = list(_compiled.keys())
             return f"Error: Unknown subagent '{subagent_type}'. Available: {available}"

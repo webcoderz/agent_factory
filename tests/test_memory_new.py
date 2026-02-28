@@ -1,11 +1,13 @@
 """Tests for the overhauled memory system."""
+
 from __future__ import annotations
 
-import pytest
-
 from agent_ext.memory import (
-    SlidingWindowMemory, approximate_token_count,
-    find_safe_cutoff, find_token_based_cutoff, is_safe_cutoff_point,
+    SlidingWindowMemory,
+    approximate_token_count,
+    find_safe_cutoff,
+    find_token_based_cutoff,
+    is_safe_cutoff_point,
 )
 
 

@@ -3,9 +3,11 @@
 Provides in-memory message passing between parent agents and subagents
 with request-response correlation (ask/answer pattern).
 """
+
 from __future__ import annotations
 
 import asyncio
+import contextlib
 import uuid
 from collections.abc import Awaitable, Callable
 from dataclasses import dataclass, field
@@ -35,10 +37,8 @@ class InMemoryMessageBus:
             raise KeyError(f"Agent '{message.receiver}' is not registered")
         await self._queues[message.receiver].put(message)
         for handler in self._handlers:
-            try:
+            with contextlib.suppress(Exception):
                 await handler(message)
-            except Exception:
-                pass
 
     async def ask(
         self,
@@ -132,7 +132,7 @@ class InMemoryMessageBus:
             try:
                 msg = await asyncio.wait_for(queue.get(), timeout=timeout)
                 messages.append(msg)
-            except asyncio.TimeoutError:
+            except TimeoutError:
                 return messages
         while not queue.empty():
             try:
@@ -152,6 +152,7 @@ def create_message_bus(backend: str = "memory", **kwargs: Any) -> InMemoryMessag
 # ---------------------------------------------------------------------------
 # Task manager
 # ---------------------------------------------------------------------------
+
 
 @dataclass
 class TaskManager:
@@ -190,16 +191,16 @@ class TaskManager:
         self._cancel_events[task_id].set()
         handle = self.handles.get(task_id)
         if handle and self.message_bus.is_registered(handle.subagent_name):
-            try:
-                await self.message_bus.send(AgentMessage(
-                    type=MessageType.CANCEL_REQUEST,
-                    sender="task_manager",
-                    receiver=handle.subagent_name,
-                    payload={"reason": "soft_cancel"},
-                    task_id=task_id,
-                ))
-            except KeyError:
-                pass
+            with contextlib.suppress(KeyError):
+                await self.message_bus.send(
+                    AgentMessage(
+                        type=MessageType.CANCEL_REQUEST,
+                        sender="task_manager",
+                        receiver=handle.subagent_name,
+                        payload={"reason": "soft_cancel"},
+                        task_id=task_id,
+                    )
+                )
         return True
 
     async def hard_cancel(self, task_id: str) -> bool:

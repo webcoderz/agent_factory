@@ -1,4 +1,5 @@
 """SQLite database backend with security controls."""
+
 from __future__ import annotations
 
 import sqlite3
@@ -52,9 +53,7 @@ class SQLiteDatabase:
 
     async def list_tables(self) -> list[TableInfo]:
         conn = self._require_conn()
-        cursor = conn.execute(
-            "SELECT name FROM sqlite_master WHERE type='table' ORDER BY name"
-        )
+        cursor = conn.execute("SELECT name FROM sqlite_master WHERE type='table' ORDER BY name")
         tables: list[TableInfo] = []
         for row in cursor.fetchall():
             name = row[0]
@@ -68,13 +67,15 @@ class SQLiteDatabase:
         cursor = conn.execute(f"PRAGMA table_info([{table_name}])")
         columns: list[dict[str, Any]] = []
         for row in cursor.fetchall():
-            columns.append({
-                "name": row[1],
-                "type": row[2],
-                "notnull": bool(row[3]),
-                "default": row[4],
-                "pk": bool(row[5]),
-            })
+            columns.append(
+                {
+                    "name": row[1],
+                    "type": row[2],
+                    "notnull": bool(row[3]),
+                    "default": row[4],
+                    "pk": bool(row[5]),
+                }
+            )
         count_cursor = conn.execute(f"SELECT COUNT(*) FROM [{table_name}]")
         count = count_cursor.fetchone()[0]
         return TableInfo(name=table_name, columns=columns, row_count=count)
@@ -113,7 +114,7 @@ class SQLiteDatabase:
             columns = [desc[0] for desc in cursor.description]
             rows_raw = cursor.fetchmany(self.config.max_rows + 1)
             truncated = len(rows_raw) > self.config.max_rows
-            rows = [list(r) for r in rows_raw[:self.config.max_rows]]
+            rows = [list(r) for r in rows_raw[: self.config.max_rows]]
 
             return QueryResult(
                 columns=columns,

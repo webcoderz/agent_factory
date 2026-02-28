@@ -1,7 +1,8 @@
 from __future__ import annotations
+
+import builtins
 import hashlib
 import os
-from typing import Dict, List
 
 from .models import SkillSpec
 
@@ -16,9 +17,10 @@ class SkillRegistry:
       skills/<skill_id>/SKILL.md
       skills/<skill_id>/spec.json (optional)
     """
-    def __init__(self, roots: List[str]):
+
+    def __init__(self, roots: builtins.list[str]):
         self.roots = roots
-        self._skills: Dict[str, SkillSpec] = {}
+        self._skills: dict[str, SkillSpec] = {}
 
     def discover(self) -> None:
         for root in self.roots:
@@ -32,7 +34,7 @@ class SkillRegistry:
                 if not os.path.exists(md_path):
                     continue
                 # Minimal spec derived from folder + first heading line
-                with open(md_path, "r", encoding="utf-8") as f:
+                with open(md_path, encoding="utf-8") as f:
                     body = f.read()
                 first_line = next((ln.strip("# ").strip() for ln in body.splitlines() if ln.strip()), entry)
                 spec = SkillSpec(
@@ -44,7 +46,7 @@ class SkillRegistry:
                 )
                 self._skills[spec.id] = spec
 
-    def list(self) -> List[SkillSpec]:
+    def list(self) -> builtins.list[SkillSpec]:
         return list(self._skills.values())
 
     def get(self, skill_id: str) -> SkillSpec:

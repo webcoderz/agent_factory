@@ -1,6 +1,212 @@
 # agent_patterns
 
-Shared patterns and extensions for building AI agents: **RunContext**, **hooks**, **evidence**, **skills**, **backends**, **memory**, **subagents**, **RLM**, **todo (task management)**, **document ingest**, **deep research**, and a [pydantic-ai](https://ai.pydantic.dev) base agent. Use one pattern or combine several; everything is designed to plug into a single `RunContext`.
+Modular, pluggable subsystems for building AI agents with [pydantic-ai](https://ai.pydantic.dev): **middleware** (async hooks, cost tracking, parallel validators, permissions), **subagents** (message bus, task delegation), **RLM** (sandboxed code execution), **backends** (filesystem, permissions, hashline editing), **memory** (token-aware, safe cutoff), **skills** (registry composition), **database** (SQL queries), **todo** (task management), **evidence**, **document ingest**, **deep research**, and more.
+
+Use one pattern or combine several — everything plugs into pydantic-ai's `Agent` via `FunctionToolset`.
+
+---
+
+## AgentPatterns — Batteries-Included Agent
+
+`AgentPatterns` inherits from pydantic-ai's `Agent` and auto-wires all subsystems. Pass toolset names as strings and get a fully-equipped agent:
+
+```python
+from agent_ext.agent import AgentPatterns
+
+# Coding assistant with filesystem + task management
+agent = AgentPatterns(
+    "openai:gpt-4o",
+    instructions="You are a helpful coding assistant.",
+    toolsets=["console", "todo"],
+)
+result = await agent.run("List all Python files and create a review task for each")
+```
+
+### Factory Methods
+
+```python
+# Console agent (ls, read, write, edit, grep, execute)
+agent = AgentPatterns.with_console("openai:gpt-4o")
+
+# Data analysis agent (sandboxed Python with sub-model delegation)
+agent = AgentPatterns.with_rlm("openai:gpt-4o", sub_model="openai:gpt-4o-mini")
+
+# Database agent (SQL queries with read-only protection)
+agent = AgentPatterns.with_database("openai:gpt-4o")
+
+# Kitchen sink — everything
+agent = AgentPatterns.with_all("openai:gpt-4o")
+```
+
+### With Memory
+
+```python
+from agent_ext.memory import SlidingWindowMemory
+
+agent = AgentPatterns(
+    "openai:gpt-4o",
+    toolsets=["console", "rlm"],
+    memory=SlidingWindowMemory(max_tokens=100_000),
+)
+```
+
+### Composing Toolsets
+
+```python
+from agent_ext.rlm import create_rlm_toolset
+from agent_ext.database import create_database_toolset
+from agent_ext.backends.console import create_console_toolset
+
+# Mix and match — pass FunctionToolset instances directly
+agent = AgentPatterns(
+    "openai:gpt-4o",
+    toolsets=[
+        create_console_toolset(),
+        create_rlm_toolset(code_timeout=120, sub_model="openai:gpt-4o-mini"),
+        create_database_toolset(),
+    ],
+)
+```
+
+### Available Toolsets
+
+| Name | Tools | Use Case |
+|------|-------|----------|
+| `"console"` | ls, read_file, write_file, edit_file, grep, glob_files, execute | File operations + shell |
+| `"rlm"` | execute_code | Sandboxed Python for data analysis |
+| `"database"` | list_tables, describe_table, sample_table, query | SQL database access |
+| `"subagents"` | task, check_task, list_active_tasks, cancel_task | Multi-agent delegation |
+| `"todo"` | create_task, list_tasks, update_task, complete_task | Task management |
+
+---
+
+## Subsystem Highlights
+
+### Middleware (hooks/)
+Async lifecycle hooks with 7 hook points, scoped context, cost tracking, parallel execution, and ALLOW/DENY/ASK permissions.
+
+```python
+from agent_ext.hooks import (
+    MiddlewareChain, AuditHook, PolicyHook,
+    CostTrackingMiddleware, ParallelMiddleware,
+    AsyncGuardrailMiddleware, GuardrailTiming,
+    make_blocklist_filter, ContentFilterHook,
+)
+
+# Cost tracking with budget enforcement
+cost_mw = CostTrackingMiddleware(
+    model_name="openai:gpt-4o",
+    budget_limit_usd=5.0,
+    on_cost_update=lambda info: print(f"Cost: ${info.total_cost_usd:.4f}"),
+)
+
+# Parallel validators (run concurrently, all must pass)
+parallel = ParallelMiddleware([
+    PIIDetector(), ProfanityFilter(), InjectionGuard(),
+])
+
+# Async guardrail (runs alongside LLM, cancels on failure)
+guardrail = AsyncGuardrailMiddleware(
+    PolicyCheck(), timing=GuardrailTiming.CONCURRENT,
+)
+
+chain = MiddlewareChain([AuditHook(), cost_mw, parallel, guardrail])
+```
+
+### Backends (backends/)
+File storage with permission presets, in-memory testing backend, and hashline editing.
+
+```python
+from agent_ext.backends import (
+    StateBackend, LocalFilesystemBackend,
+    PermissionChecker, READONLY_RULESET,
+    format_hashline_output, apply_hashline_edit,
+)
+
+# In-memory backend for testing
+backend = StateBackend()
+backend.write_text("src/app.py", "def hello(): pass")
+
+# Permission checking
+checker = PermissionChecker(READONLY_RULESET)
+assert checker.is_allowed("read", "/src/app.py")  # True
+assert not checker.is_allowed("write", "/src/app.py")  # False
+
+# Hashline editing (precise, low-token edits)
+tagged = format_hashline_output("line one\nline two\n")
+# 1:a3|line one
+# 2:f1|line two
+```
+
+### RLM (rlm/)
+Sandboxed REPL for large-context analysis with sub-model delegation.
+
+```python
+from agent_ext.rlm import REPLEnvironment, RLMConfig
+
+repl = REPLEnvironment(
+    context=massive_document,
+    config=RLMConfig(sub_model="openai:gpt-4o-mini"),
+)
+
+result = repl.execute("""
+lines = context.split('\\n')
+relevant = [l for l in lines if 'revenue' in l.lower()]
+analysis = llm_query(f"Summarize: {relevant[:5]}")
+print(analysis)
+""")
+```
+
+### Database (database/)
+SQL capabilities with security controls.
+
+```python
+from agent_ext.database import SQLiteDatabase, DatabaseConfig
+
+async with SQLiteDatabase("data.db", DatabaseConfig(read_only=True)) as db:
+    tables = await db.list_tables()
+    result = await db.execute_query("SELECT * FROM users WHERE age > 25")
+```
+
+### Subagents (subagents/)
+Multi-agent orchestration with message bus and task management.
+
+```python
+from agent_ext.subagents import (
+    DynamicAgentRegistry, InMemoryMessageBus,
+    SubAgentConfig, decide_execution_mode,
+)
+
+registry = DynamicAgentRegistry(max_agents=10)
+bus = InMemoryMessageBus()
+response = await bus.ask("parent", "worker", "Analyze this data", task_id="t1")
+```
+
+### Memory (memory/)
+Token-aware sliding window that never splits tool call/response pairs.
+
+```python
+from agent_ext.memory import SlidingWindowMemory
+
+memory = SlidingWindowMemory(
+    max_tokens=100_000,
+    trigger_tokens=80_000,
+)
+```
+
+### Skills (skills/)
+Progressive-disclosure instruction packs with registry composition.
+
+```python
+from agent_ext.skills import create_skill, CombinedRegistry, FilteredRegistry
+
+skill = create_skill(
+    id="code_review", name="Code Review",
+    description="Review code for quality",
+    body="# Code Review\n\nCheck for...",
+    tags=["code"],
+)
+```
 
 ---
 

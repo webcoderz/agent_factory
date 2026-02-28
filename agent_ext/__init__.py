@@ -1,9 +1,11 @@
 from __future__ import annotations
 
+
 # Ensure root package is importable when run from repo root (e.g. uv run python main.py)
 def _ensure_root_importable() -> None:
     import sys
     from pathlib import Path
+
     _root = Path(__file__).resolve().parent.parent
     _parent = _root.parent
     if _parent not in (Path(p).resolve() for p in sys.path):
@@ -15,28 +17,42 @@ _ensure_root_importable()
 # ---------------------------------------------------------------------------
 # Lightweight, always-needed imports (fast: ~10ms total)
 # ---------------------------------------------------------------------------
-from .run_context import RunContext, ToolCall, ToolResult
-from .hooks.base import Hook, BlockedToolCall, BlockedPrompt, AgentMiddleware
-from .hooks.builtins import AuditHook, PolicyHook, ContentFilterHook, ContentFilterFn, make_blocklist_filter, ConditionalMiddleware
-from .hooks.chain import HookChain, MiddlewareChain
-from .hooks.context import MiddlewareContext, ScopedContext, HookType, ContextAccessError
-from .hooks.exceptions import InputBlocked, ToolBlocked, OutputBlocked, BudgetExceededError, MiddlewareTimeout, MiddlewareError
-from .hooks.permissions import ToolDecision, ToolPermissionResult, PermissionHandler
-from .hooks.strategies import AggregationStrategy, GuardrailTiming
-from .evidence.models import Citation, Provenance, Evidence
-from .skills.models import SkillSpec, LoadedSkill
-from .skills.registry import SkillRegistry
 from .backends.local_fs import LocalFilesystemBackend
 from .backends.sandbox_exec import LocalSubprocessExecBackend
+from .evidence.models import Citation, Evidence, Provenance
+from .export.base import Exporter
+from .export.models import ExportRequest, ExportResult
+from .hooks.base import AgentMiddleware, BlockedPrompt, BlockedToolCall, Hook
+from .hooks.builtins import (
+    AuditHook,
+    ConditionalMiddleware,
+    ContentFilterFn,
+    ContentFilterHook,
+    PolicyHook,
+    make_blocklist_filter,
+)
+from .hooks.chain import HookChain, MiddlewareChain
+from .hooks.context import ContextAccessError, HookType, MiddlewareContext, ScopedContext
+from .hooks.exceptions import (
+    BudgetExceededError,
+    InputBlocked,
+    MiddlewareError,
+    MiddlewareTimeout,
+    OutputBlocked,
+    ToolBlocked,
+)
+from .hooks.permissions import PermissionHandler, ToolDecision, ToolPermissionResult
+from .hooks.strategies import AggregationStrategy, GuardrailTiming
 from .memory.summarize import SummarizingMemory
 from .memory.window import SlidingWindowMemory
+from .run_context import RunContext, ToolCall, ToolResult
+from .skills.models import LoadedSkill, SkillSpec
+from .skills.registry import SkillRegistry
+from .todo.events import InProcessEventBus, TaskEvent, TaskEventBus, WebhookEventBus
 from .todo.models import Task, TaskCreate, TaskPatch, TaskQuery, TaskStatus
 from .todo.store_base import TaskStore
 from .todo.store_memory import InMemoryTaskStore
-from .todo.events import TaskEvent, TaskEventBus, InProcessEventBus, WebhookEventBus
 from .todo.toolset import TodoToolset
-from .export.models import ExportResult, ExportRequest
-from .export.base import Exporter
 
 # ---------------------------------------------------------------------------
 # Heavy imports deferred via __getattr__ (pydantic-ai ~0.5s, exporters, etc.)
@@ -44,37 +60,94 @@ from .export.base import Exporter
 # ---------------------------------------------------------------------------
 
 __all__ = [
-    "RunContext", "ToolCall", "ToolResult",
+    "RunContext",
+    "ToolCall",
+    "ToolResult",
     # Hooks / middleware
-    "AgentMiddleware", "Hook", "BlockedToolCall", "BlockedPrompt",
-    "AuditHook", "PolicyHook", "ContentFilterHook", "ContentFilterFn", "make_blocklist_filter",
+    "AgentMiddleware",
+    "Hook",
+    "BlockedToolCall",
+    "BlockedPrompt",
+    "AuditHook",
+    "PolicyHook",
+    "ContentFilterHook",
+    "ContentFilterFn",
+    "make_blocklist_filter",
     "ConditionalMiddleware",
-    "HookChain", "MiddlewareChain",
-    "MiddlewareContext", "ScopedContext", "HookType", "ContextAccessError",
-    "InputBlocked", "ToolBlocked", "OutputBlocked", "BudgetExceededError", "MiddlewareTimeout", "MiddlewareError",
-    "ToolDecision", "ToolPermissionResult", "PermissionHandler",
-    "AggregationStrategy", "GuardrailTiming",
-    "CostTrackingMiddleware", "CostInfo",
-    "ParallelMiddleware", "AsyncGuardrailMiddleware",
+    "HookChain",
+    "MiddlewareChain",
+    "MiddlewareContext",
+    "ScopedContext",
+    "HookType",
+    "ContextAccessError",
+    "InputBlocked",
+    "ToolBlocked",
+    "OutputBlocked",
+    "BudgetExceededError",
+    "MiddlewareTimeout",
+    "MiddlewareError",
+    "ToolDecision",
+    "ToolPermissionResult",
+    "PermissionHandler",
+    "AggregationStrategy",
+    "GuardrailTiming",
+    "CostTrackingMiddleware",
+    "CostInfo",
+    "ParallelMiddleware",
+    "AsyncGuardrailMiddleware",
     "middleware_from_functions",
-    "Citation", "Provenance", "Evidence",
-    "SkillSpec", "LoadedSkill",
+    "Citation",
+    "Provenance",
+    "Evidence",
+    "SkillSpec",
+    "LoadedSkill",
     "SkillRegistry",
-    "LocalFilesystemBackend", "LocalSubprocessExecBackend",
-    "SummarizingMemory", "SlidingWindowMemory",
-    "Subagent", "SubagentResult",
-    "SubagentOrchestrator", "SubagentRegistry",
-    "RLMPolicy", "run_restricted_python",
-    "DocumentInput", "IngestResult", "PageImage", "OCRPage", "OCRSpan", "PageOCROutput", "PageOCRElement",
-    "PDFToImages", "OCREngine", "PageExtractor",
-    "OCRValidator", "OCRValidationPolicy", "ValidationEvidenceEmitter",
-    "IngestPipeline", "OCRRetryAction", "MultiExtractor",
-    "Task", "TaskCreate", "TaskPatch", "TaskQuery", "TaskStatus",
-    "TaskStore", "InMemoryTaskStore", "PostgresTaskStore",
-    "TaskEvent", "TaskEventBus", "InProcessEventBus", "WebhookEventBus",
+    "LocalFilesystemBackend",
+    "LocalSubprocessExecBackend",
+    "SummarizingMemory",
+    "SlidingWindowMemory",
+    "Subagent",
+    "SubagentResult",
+    "SubagentOrchestrator",
+    "SubagentRegistry",
+    "RLMPolicy",
+    "run_restricted_python",
+    "DocumentInput",
+    "IngestResult",
+    "PageImage",
+    "OCRPage",
+    "OCRSpan",
+    "PageOCROutput",
+    "PageOCRElement",
+    "PDFToImages",
+    "OCREngine",
+    "PageExtractor",
+    "OCRValidator",
+    "OCRValidationPolicy",
+    "ValidationEvidenceEmitter",
+    "IngestPipeline",
+    "OCRRetryAction",
+    "MultiExtractor",
+    "Task",
+    "TaskCreate",
+    "TaskPatch",
+    "TaskQuery",
+    "TaskStatus",
+    "TaskStore",
+    "InMemoryTaskStore",
+    "PostgresTaskStore",
+    "TaskEvent",
+    "TaskEventBus",
+    "InProcessEventBus",
+    "WebhookEventBus",
     "TodoToolset",
-    "ExportResult", "ExportRequest",
-    "Exporter", "HtmlExporter", "DocxExporter", "PdfExporter", "PptxExporter",
+    "ExportResult",
+    "ExportRequest",
+    "Exporter",
+    "HtmlExporter",
+    "DocxExporter",
+    "PdfExporter",
+    "PptxExporter",
     "LLMVisionOCREngine",
     "PydanticAIAgentBase",
 ]
@@ -171,6 +244,7 @@ def __getattr__(name: str) -> object:
     if name in _LAZY_IMPORTS:
         mod_path, attr = _LAZY_IMPORTS[name]
         import importlib
+
         try:
             mod = importlib.import_module(mod_path)
             obj = getattr(mod, attr)

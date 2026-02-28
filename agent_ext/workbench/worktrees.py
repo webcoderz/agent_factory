@@ -5,7 +5,6 @@ import shutil
 import subprocess
 from dataclasses import dataclass
 from pathlib import Path
-from typing import Optional, Tuple
 
 WORKTREES_ROOT = Path(".agent_state/worktrees")
 
@@ -18,7 +17,7 @@ class WorktreeHandle:
     path: Path
 
 
-def _run(cmd: list[str], *, cwd: Optional[Path] = None) -> Tuple[bool, str]:
+def _run(cmd: list[str], *, cwd: Path | None = None) -> tuple[bool, str]:
     env = os.environ.copy()  # includes HTTP_PROXY/HTTPS_PROXY/etc.
     p = subprocess.run(cmd, cwd=str(cwd) if cwd else None, env=env, capture_output=True, text=True)
     ok = p.returncode == 0

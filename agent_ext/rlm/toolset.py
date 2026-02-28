@@ -11,15 +11,15 @@ Example::
     deps = RLMDependencies(context={"users": [...]})
     result = await agent.run("Analyze the user data", deps=deps)
 """
+
 from __future__ import annotations
 
 import asyncio
-from typing import Any
 
 from pydantic_ai import RunContext
 from pydantic_ai.toolsets import FunctionToolset
 
-from .models import RLMConfig, RLMDependencies, REPLResult
+from .models import REPLResult, RLMConfig, RLMDependencies
 from .repl import REPLEnvironment, format_repl_result
 
 EXECUTE_CODE_DESCRIPTION = """

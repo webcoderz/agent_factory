@@ -1,36 +1,62 @@
 """Tests for the overhauled hooks/middleware system."""
+
 from __future__ import annotations
 
-import asyncio
 import pytest
 
 from agent_ext.hooks import (
-    AgentMiddleware, MiddlewareChain, MiddlewareContext, HookType, ScopedContext,
-    ContextAccessError, AuditHook, PolicyHook, ContentFilterHook,
-    CostTrackingMiddleware, CostInfo,
-    ParallelMiddleware, AggregationStrategy,
-    ToolDecision, ToolPermissionResult,
-    InputBlocked, ToolBlocked, OutputBlocked, BudgetExceededError,
-    MiddlewareTimeout, make_blocklist_filter,
-    ConditionalMiddleware, HookChain, BlockedToolCall, BlockedPrompt,
+    AgentMiddleware,
+    AggregationStrategy,
+    AuditHook,
+    BlockedPrompt,
+    BlockedToolCall,
+    BudgetExceededError,
+    ConditionalMiddleware,
+    ContentFilterHook,
+    ContextAccessError,
+    CostTrackingMiddleware,
+    HookType,
+    InputBlocked,
+    MiddlewareChain,
+    MiddlewareContext,
+    ParallelMiddleware,
+    PolicyHook,
+    ToolBlocked,
+    make_blocklist_filter,
 )
-from agent_ext.run_context import RunContext, Policy
+from agent_ext.run_context import Policy, RunContext
 
 
 def _make_ctx(**kw):
     class _C(dict):
-        def get(self, k, d=None): return super().get(k, d)
-        def set(self, k, v): super().__setitem__(k, v)
+        def get(self, k, d=None):
+            return super().get(k, d)
+
+        def set(self, k, v):
+            super().__setitem__(k, v)
+
     class _L:
-        def info(self, msg, **k): pass
-        def warning(self, msg, **k): pass
-        def error(self, msg, **k): pass
+        def info(self, msg, **k):
+            pass
+
+        def warning(self, msg, **k):
+            pass
+
+        def error(self, msg, **k):
+            pass
+
     class _A:
-        def put_json(self, k, o): return k
+        def put_json(self, k, o):
+            return k
+
     return RunContext(
-        case_id="c1", session_id="s1", user_id="u1",
+        case_id="c1",
+        session_id="s1",
+        user_id="u1",
         policy=kw.get("policy", Policy(allow_tools=True)),
-        cache=_C(), logger=_L(), artifacts=_A(),
+        cache=_C(),
+        logger=_L(),
+        artifacts=_A(),
     )
 
 
@@ -84,14 +110,17 @@ class TestMiddlewareChain:
     @pytest.mark.asyncio
     async def test_before_run_order(self):
         order = []
+
         class M1(AgentMiddleware):
             async def before_run(self, ctx, prompt):
                 order.append("M1")
                 return prompt
+
         class M2(AgentMiddleware):
             async def before_run(self, ctx, prompt):
                 order.append("M2")
                 return prompt
+
         chain = MiddlewareChain([M1(), M2()])
         await chain.before_run(_make_ctx(), "hello")
         assert order == ["M1", "M2"]
@@ -99,14 +128,17 @@ class TestMiddlewareChain:
     @pytest.mark.asyncio
     async def test_after_run_reverse_order(self):
         order = []
+
         class M1(AgentMiddleware):
             async def after_run(self, ctx, prompt, output):
                 order.append("M1")
                 return output
+
         class M2(AgentMiddleware):
             async def after_run(self, ctx, prompt, output):
                 order.append("M2")
                 return output
+
         chain = MiddlewareChain([M1(), M2()])
         await chain.after_run(_make_ctx(), "hello", "result")
         assert order == ["M2", "M1"]
@@ -114,11 +146,14 @@ class TestMiddlewareChain:
     @pytest.mark.asyncio
     async def test_tool_name_filtering(self):
         called = []
+
         class OnlySearch(AgentMiddleware):
             tool_names = {"search"}
+
             async def before_tool_call(self, ctx, tool_name, tool_args):
                 called.append(tool_name)
                 return tool_args
+
         chain = MiddlewareChain([OnlySearch()])
         await chain.before_tool_call(_make_ctx(), "search", {})
         await chain.before_tool_call(_make_ctx(), "delete", {})
@@ -181,7 +216,8 @@ class TestCostTracking:
     async def test_cost_accumulation(self):
         costs = []
         mw = CostTrackingMiddleware(
-            cost_per_1k_input=1.0, cost_per_1k_output=2.0,
+            cost_per_1k_input=1.0,
+            cost_per_1k_output=2.0,
             on_cost_update=lambda info: costs.append(info),
         )
         ctx = _make_ctx()
@@ -200,6 +236,7 @@ class TestParallelMiddleware:
         class PassThrough(AgentMiddleware):
             async def before_run(self, ctx, prompt):
                 return prompt
+
         par = ParallelMiddleware([PassThrough(), PassThrough()], strategy=AggregationStrategy.ALL_MUST_PASS)
         result = await par.before_run(_make_ctx(), "hello")
         assert result == "hello"
@@ -209,7 +246,9 @@ class TestParallelMiddleware:
         class Failer(AgentMiddleware):
             async def before_run(self, ctx, prompt):
                 raise InputBlocked("bad")
+
         from agent_ext.hooks.exceptions import ParallelExecutionFailed
+
         par = ParallelMiddleware([Failer()], strategy=AggregationStrategy.ALL_MUST_PASS)
         with pytest.raises(ParallelExecutionFailed):
             await par.before_run(_make_ctx(), "hello")
@@ -219,10 +258,12 @@ class TestConditionalMiddleware:
     @pytest.mark.asyncio
     async def test_runs_when_condition_true(self):
         called = []
+
         class Logger(AgentMiddleware):
             async def before_run(self, ctx, prompt):
                 called.append(True)
                 return prompt
+
         cond = ConditionalMiddleware(Logger(), condition=lambda ctx: True)
         await cond.before_run(_make_ctx(), "hello")
         assert called == [True]
@@ -230,10 +271,12 @@ class TestConditionalMiddleware:
     @pytest.mark.asyncio
     async def test_skips_when_condition_false(self):
         called = []
+
         class Logger(AgentMiddleware):
             async def before_run(self, ctx, prompt):
                 called.append(True)
                 return prompt
+
         cond = ConditionalMiddleware(Logger(), condition=lambda ctx: False)
         await cond.before_run(_make_ctx(), "hello")
         assert called == []

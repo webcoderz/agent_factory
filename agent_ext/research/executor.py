@@ -1,13 +1,12 @@
 from __future__ import annotations
 
 import time
-from typing import Awaitable, Callable, Dict, List, Optional, Sequence
+from collections.abc import Awaitable, Callable, Sequence
 
 from agent_ext.evidence.models import Evidence, Provenance
-from agent_ext.run_context import RunContext
-from agent_ext.research.models import ResearchTask
 from agent_ext.research.ledger import ResearchLedger
-
+from agent_ext.research.models import ResearchTask
+from agent_ext.run_context import RunContext
 
 TaskHandler = Callable[[RunContext, ResearchTask, ResearchLedger], Awaitable[Sequence[Evidence]]]
 
@@ -17,10 +16,10 @@ class ResearchExecutor:
     Executes ResearchTask via handlers (kind-based).
     """
 
-    def __init__(self, handlers: Dict[str, TaskHandler]):
+    def __init__(self, handlers: dict[str, TaskHandler]):
         self.handlers = handlers
 
-    async def run_task(self, ctx: RunContext, task: ResearchTask, ledger: ResearchLedger) -> List[Evidence]:
+    async def run_task(self, ctx: RunContext, task: ResearchTask, ledger: ResearchLedger) -> list[Evidence]:
         if task.kind not in self.handlers:
             # Return a diagnostic Evidence instead of hard failing
             return [

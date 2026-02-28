@@ -15,12 +15,11 @@ Example::
 
     mw = middleware_from_functions(before_run=log_prompt, after_run=sanitize_output)
 """
+
 from __future__ import annotations
 
-from collections.abc import Callable, Sequence
-from typing import Any, Awaitable
+from collections.abc import Callable
 
-from agent_ext.run_context import RunContext
 from .base import AgentMiddleware
 
 

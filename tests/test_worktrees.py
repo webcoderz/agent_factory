@@ -1,20 +1,14 @@
 """Tests for agent_ext.workbench.worktrees — worktree create, diff, cleanup."""
-from __future__ import annotations
 
-import os
-import subprocess
-import tempfile
-from pathlib import Path
+from __future__ import annotations
 
 import pytest
 
 from agent_ext.workbench.worktrees import (
-    WorktreeHandle,
     _run,
-    create_worktree,
     cleanup_worktree,
+    create_worktree,
     worktree_diff,
-    worktree_status,
 )
 
 

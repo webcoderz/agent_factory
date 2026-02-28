@@ -3,6 +3,7 @@
 Tracks token usage across agent runs, calculates costs, supports callbacks
 for real-time UI updates, and enforces budget limits.
 """
+
 from __future__ import annotations
 
 import inspect

@@ -5,14 +5,15 @@ Legacy sync imports (``AuditHook``, ``PolicyHook``, ``ContentFilterHook``,
 ``make_blocklist_filter``) still work — they subclass both ``AgentMiddleware``
 and implement the old sync ``Hook`` interface for backward-compat.
 """
+
 from __future__ import annotations
 
 import re
 import time
 from collections.abc import Callable, Sequence
-from typing import Any, Literal, Optional
+from typing import Any, Literal
 
-from agent_ext.run_context import RunContext, ToolCall, ToolResult
+from agent_ext.run_context import RunContext
 
 from .base import AgentMiddleware
 from .exceptions import InputBlocked, ToolBlocked
@@ -24,6 +25,7 @@ ContentFilterFn = Callable[[RunContext, Any, Literal["request", "response"]], An
 # ---------------------------------------------------------------------------
 # AuditHook (async middleware + legacy sync interface)
 # ---------------------------------------------------------------------------
+
 
 class AuditHook(AgentMiddleware):
     """Logs lifecycle events: run start/end, model requests, tool calls."""
@@ -59,6 +61,7 @@ class AuditHook(AgentMiddleware):
 # PolicyHook
 # ---------------------------------------------------------------------------
 
+
 class PolicyHook(AgentMiddleware):
     """Enforces ``ctx.policy`` — blocks tools when ``allow_tools=False``."""
 
@@ -71,6 +74,7 @@ class PolicyHook(AgentMiddleware):
 # ---------------------------------------------------------------------------
 # Content filtering
 # ---------------------------------------------------------------------------
+
 
 def _default_extract_text(payload: Any, phase: Literal["request", "response"]) -> str:
     """Best-effort text extraction from a request/response payload."""
@@ -162,6 +166,7 @@ class ContentFilterHook(AgentMiddleware):
 # ---------------------------------------------------------------------------
 # Conditional middleware
 # ---------------------------------------------------------------------------
+
 
 class ConditionalMiddleware(AgentMiddleware):
     """Wraps another middleware, only executing it when ``condition(ctx)`` is True.

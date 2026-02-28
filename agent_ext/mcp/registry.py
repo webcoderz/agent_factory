@@ -1,22 +1,23 @@
 from __future__ import annotations
 
-from typing import Any, Awaitable, Callable, Dict, List, Optional
+from collections.abc import Callable
+from typing import Any
 
-from .types import ToolSpec, ToolResult
+from .types import ToolResult, ToolSpec
 
 ToolFn = Callable[[dict], Any]
 
 
 class MCPToolRegistry:
     def __init__(self):
-        self._specs: Dict[str, ToolSpec] = {}
-        self._fns: Dict[str, ToolFn] = {}
+        self._specs: dict[str, ToolSpec] = {}
+        self._fns: dict[str, ToolFn] = {}
 
     def register(self, spec: ToolSpec, fn: ToolFn) -> None:
         self._specs[spec.name] = spec
         self._fns[spec.name] = fn
 
-    def list_specs(self) -> List[ToolSpec]:
+    def list_specs(self) -> list[ToolSpec]:
         return [self._specs[k] for k in sorted(self._specs)]
 
     def call(self, tool: str, args: dict, call_id: str) -> ToolResult:

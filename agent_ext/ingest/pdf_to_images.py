@@ -1,7 +1,9 @@
 from __future__ import annotations
-from typing import List, Protocol
+
+from typing import Protocol
 
 from agent_ext.run_context import RunContext
+
 from .models import DocumentInput, PageImage
 
 
@@ -15,14 +17,14 @@ class PDFToImages:
         self.renderer = renderer
         self.dpi = dpi
 
-    def run(self, ctx: RunContext, doc: DocumentInput) -> List[PageImage]:
+    def run(self, ctx: RunContext, doc: DocumentInput) -> list[PageImage]:
         if not doc.artifact_id:
             raise ValueError("PDFToImages currently expects doc.artifact_id for auditability")
 
         pdf_bytes = ctx.artifacts.get_bytes(doc.artifact_id)
         n = self.renderer.page_count(pdf_bytes=pdf_bytes)
 
-        pages: List[PageImage] = []
+        pages: list[PageImage] = []
         for i in range(n):
             png = self.renderer.render_to_png_bytes(pdf_bytes=pdf_bytes, page_index=i, dpi=self.dpi)
             img_id = ctx.artifacts.put_bytes(

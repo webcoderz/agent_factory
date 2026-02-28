@@ -3,7 +3,6 @@ from __future__ import annotations
 import asyncio
 import os
 import random
-import time
 from dataclasses import dataclass
 
 from agent_ext.cog.loop_v2 import run_cognitive_cycle
@@ -74,4 +73,5 @@ async def run_forever(ctx, *, cfg: DaemonConfig | None = None) -> None:
 if __name__ == "__main__":
     # So "python -m agent_ext.cog.daemon" works the same as "python -m agent_ext.cog"
     from agent_ext.cog.__main__ import main
+
     main()

@@ -1,4 +1,5 @@
 """Tests for agent_ext.cog.scoring — Score properties and score_patch."""
+
 from __future__ import annotations
 
 from agent_ext.cog.scoring import Score, score_patch, touched_files_from_diff

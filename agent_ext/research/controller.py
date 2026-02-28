@@ -1,16 +1,15 @@
 from __future__ import annotations
 
 import time
-from typing import Dict, List, Optional
 
-from agent_ext.run_context import RunContext
-from agent_ext.research.models import ResearchBudget, ResearchOutcome, ResearchPlan, ResearchTask
-from agent_ext.research.planner import ResearchPlanner
-from agent_ext.research.executor import ResearchExecutor
-from agent_ext.research.ledger import ResearchLedger
 from agent_ext.research.evidence_graph import EvidenceGraph
+from agent_ext.research.executor import ResearchExecutor
 from agent_ext.research.gap_analysis import propose_gaps
+from agent_ext.research.ledger import ResearchLedger
+from agent_ext.research.models import ResearchBudget, ResearchOutcome
+from agent_ext.research.planner import ResearchPlanner
 from agent_ext.research.synth import build_outcome
+from agent_ext.run_context import RunContext
 
 
 class DeepResearchController:
@@ -105,5 +104,8 @@ class DeepResearchController:
         ledger.add_event("research_end", {"steps": steps})
 
         # store final report artifact
-        ctx.artifacts.put_json(outcome.model_dump(), metadata={"kind": "research_outcome", "case_id": ctx.case_id, "session_id": ctx.session_id})
+        ctx.artifacts.put_json(
+            outcome.model_dump(),
+            metadata={"kind": "research_outcome", "case_id": ctx.case_id, "session_id": ctx.session_id},
+        )
         return outcome

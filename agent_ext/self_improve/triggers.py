@@ -2,7 +2,6 @@ from __future__ import annotations
 
 import json
 from pathlib import Path
-from typing import Dict, Optional
 
 from .models import TriggerEvent
 
@@ -13,7 +12,7 @@ class TriggerStore:
     def __init__(self, path: Path = TRIGGERS_FILE):
         self.path = path
         self.path.parent.mkdir(parents=True, exist_ok=True)
-        self._data: Dict[str, int] = {}
+        self._data: dict[str, int] = {}
         self._load()
 
     def _load(self) -> None:

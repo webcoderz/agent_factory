@@ -1,37 +1,57 @@
 """Tests for gap-fill code: strategies, async guardrail, decorators, prompts, wiring."""
+
 from __future__ import annotations
 
-import asyncio
 import pytest
 
 from agent_ext.hooks import (
-    AsyncGuardrailMiddleware, GuardrailTiming, AggregationStrategy,
-    AgentMiddleware, InputBlocked, MiddlewareChain, middleware_from_functions,
+    AgentMiddleware,
+    AggregationStrategy,
+    AsyncGuardrailMiddleware,
+    GuardrailTiming,
+    InputBlocked,
+    middleware_from_functions,
 )
 from agent_ext.hooks.strategies import GuardrailTiming as GT
+from agent_ext.run_context import Policy, RunContext
 from agent_ext.subagents.prompts import (
-    get_subagent_system_prompt, get_task_instructions_prompt,
-    SUBAGENT_SYSTEM_PROMPT, TASK_TOOL_DESCRIPTION,
+    SUBAGENT_SYSTEM_PROMPT,
+    get_subagent_system_prompt,
+    get_task_instructions_prompt,
 )
-from agent_ext.subagents.protocols import SubAgentDepsProtocol
 from agent_ext.subagents.types import SubAgentConfig
-from agent_ext.run_context import RunContext, Policy
 
 
 def _make_ctx():
     class _C(dict):
-        def get(self, k, d=None): return super().get(k, d)
-        def set(self, k, v): super().__setitem__(k, v)
+        def get(self, k, d=None):
+            return super().get(k, d)
+
+        def set(self, k, v):
+            super().__setitem__(k, v)
+
     class _L:
-        def info(self, msg, **k): pass
-        def warning(self, msg, **k): pass
-        def error(self, msg, **k): pass
+        def info(self, msg, **k):
+            pass
+
+        def warning(self, msg, **k):
+            pass
+
+        def error(self, msg, **k):
+            pass
+
     class _A:
-        def put_json(self, k, o): return k
+        def put_json(self, k, o):
+            return k
+
     return RunContext(
-        case_id="c1", session_id="s1", user_id="u1",
+        case_id="c1",
+        session_id="s1",
+        user_id="u1",
         policy=Policy(allow_tools=True),
-        cache=_C(), logger=_L(), artifacts=_A(),
+        cache=_C(),
+        logger=_L(),
+        artifacts=_A(),
     )
 
 
@@ -56,6 +76,7 @@ class TestAsyncGuardrail:
         class PassGuardrail(AgentMiddleware):
             async def before_run(self, ctx, prompt):
                 return prompt
+
         grd = AsyncGuardrailMiddleware(PassGuardrail(), timing=GuardrailTiming.BLOCKING)
         result = await grd.before_run(_make_ctx(), "hello")
         assert result == "hello"
@@ -65,6 +86,7 @@ class TestAsyncGuardrail:
         class BlockGuardrail(AgentMiddleware):
             async def before_run(self, ctx, prompt):
                 raise InputBlocked("blocked!")
+
         grd = AsyncGuardrailMiddleware(BlockGuardrail(), timing=GuardrailTiming.BLOCKING)
         with pytest.raises(InputBlocked):
             await grd.before_run(_make_ctx(), "hello")
@@ -74,6 +96,7 @@ class TestAsyncGuardrail:
         class BlockGuardrail(AgentMiddleware):
             async def before_run(self, ctx, prompt):
                 raise InputBlocked("blocked!")
+
         grd = AsyncGuardrailMiddleware(BlockGuardrail(), timing=GuardrailTiming.ASYNC_POST)
         # before_run should pass (ASYNC_POST doesn't check before)
         result = await grd.before_run(_make_ctx(), "hello")
@@ -88,6 +111,7 @@ class TestDecoratorMiddleware:
     async def test_before_run_decorator(self):
         async def log_prompt(ctx, prompt):
             return f"[logged] {prompt}"
+
         mw = middleware_from_functions(before_run=log_prompt)
         result = await mw.before_run(_make_ctx(), "hello")
         assert result == "[logged] hello"
@@ -95,12 +119,15 @@ class TestDecoratorMiddleware:
     @pytest.mark.asyncio
     async def test_multiple_hooks(self):
         calls = []
+
         async def br(ctx, prompt):
             calls.append("before_run")
             return prompt
+
         async def ar(ctx, prompt, output):
             calls.append("after_run")
             return output
+
         mw = middleware_from_functions(before_run=br, after_run=ar)
         await mw.before_run(_make_ctx(), "p")
         await mw.after_run(_make_ctx(), "p", "o")
@@ -140,6 +167,7 @@ class TestSubagentPrompts:
 class TestRuntimeWiring:
     def test_build_ctx_has_middleware(self):
         from agent_ext.workbench.runtime import build_ctx
+
         ctx = build_ctx()
         assert hasattr(ctx, "middleware_chain")
         assert len(ctx.middleware_chain) == 2
@@ -150,6 +178,7 @@ class TestRuntimeWiring:
 
     def test_modules_loaded(self):
         from agent_ext.workbench.runtime import build_ctx
+
         ctx = build_ctx()
         module_names = list(ctx.module_registry.modules.keys())
         assert "core" in module_names

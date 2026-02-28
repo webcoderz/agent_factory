@@ -1,13 +1,19 @@
 """Tests for the overhauled backends system."""
+
 from __future__ import annotations
 
 import pytest
 
 from agent_ext.backends import (
-    StateBackend, LocalFilesystemBackend,
-    PermissionChecker, READONLY_RULESET, PERMISSIVE_RULESET, DEFAULT_RULESET,
-    create_ruleset, PermissionRuleset, OperationPermissions, PermissionRule,
-    format_hashline_output, apply_hashline_edit, line_hash,
+    DEFAULT_RULESET,
+    PERMISSIVE_RULESET,
+    READONLY_RULESET,
+    PermissionChecker,
+    StateBackend,
+    apply_hashline_edit,
+    create_ruleset,
+    format_hashline_output,
+    line_hash,
 )
 
 
@@ -139,7 +145,9 @@ class TestHashline:
     def test_apply_edit_insert_after(self):
         content = "first\nsecond\nthird\n"
         h = line_hash("first")
-        new_content, error = apply_hashline_edit(content, start_line=1, start_hash=h, new_content="inserted", insert_after=True)
+        new_content, error = apply_hashline_edit(
+            content, start_line=1, start_hash=h, new_content="inserted", insert_after=True
+        )
         assert error is None
         lines = new_content.strip().split("\n")
         assert lines[0] == "first"

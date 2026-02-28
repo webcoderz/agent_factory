@@ -1,8 +1,7 @@
 from __future__ import annotations
 
-import asyncio
 import uuid
-from typing import Any, Dict, Optional
+from typing import Any
 
 from .transport import LocalTransport
 from .types import ToolCall, ToolResult
@@ -12,7 +11,7 @@ class MCPClient:
     def __init__(self, transport: LocalTransport):
         self.transport = transport
 
-    async def call(self, tool: str, args: Dict[str, Any]) -> ToolResult:
+    async def call(self, tool: str, args: dict[str, Any]) -> ToolResult:
         call_id = uuid.uuid4().hex
         await self.transport.server_in.put(ToolCall(tool=tool, args=args, call_id=call_id))
         # naive: wait for matching call_id

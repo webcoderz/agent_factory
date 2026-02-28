@@ -1,4 +1,5 @@
 """Execution strategies for parallel middleware and guardrails."""
+
 from __future__ import annotations
 
 from enum import Enum
@@ -12,6 +13,7 @@ class AggregationStrategy(Enum):
     - RACE: first to complete (even if error)
     - COLLECT_ALL: return all results as a list
     """
+
     ALL_MUST_PASS = "all_must_pass"
     FIRST_SUCCESS = "first_success"
     RACE = "race"
@@ -25,6 +27,7 @@ class GuardrailTiming(Enum):
     - CONCURRENT: guardrail runs alongside LLM, fail-fast on violation
     - ASYNC_POST: guardrail runs after LLM (monitoring only, non-blocking)
     """
+
     BLOCKING = "blocking"
     CONCURRENT = "concurrent"
     ASYNC_POST = "async_post"

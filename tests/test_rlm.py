@@ -1,12 +1,18 @@
 """Tests for the overhauled RLM system."""
+
 from __future__ import annotations
 
 import pytest
 
 from agent_ext.rlm import (
-    REPLEnvironment, RLMConfig, REPLResult, GroundedResponse,
-    RLMPolicy, run_restricted_python, RLMRunError,
+    GroundedResponse,
+    REPLEnvironment,
+    REPLResult,
+    RLMConfig,
+    RLMPolicy,
+    RLMRunError,
     format_repl_result,
+    run_restricted_python,
 )
 
 

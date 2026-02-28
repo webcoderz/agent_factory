@@ -1,7 +1,9 @@
 from __future__ import annotations
+
 from html import escape
-from agent_ext.export.base import Exporter
+
 from agent_ext.export.models import ExportRequest
+
 
 class HtmlExporter:
     def mime_type(self) -> str:
@@ -18,7 +20,10 @@ class HtmlExporter:
         limitations = outcome.get("limitations") or []
 
         def li(items):
-            return "\n".join(f"<li>{escape(str(x.get('text', x)))}</li>" if isinstance(x, dict) else f"<li>{escape(str(x))}</li>" for x in items)
+            return "\n".join(
+                f"<li>{escape(str(x.get('text', x)))}</li>" if isinstance(x, dict) else f"<li>{escape(str(x))}</li>"
+                for x in items
+            )
 
         html = f"""<!doctype html>
 <html>

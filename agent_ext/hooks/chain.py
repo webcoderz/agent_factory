@@ -7,25 +7,26 @@ adding a chain flattens it.
 
 The legacy sync ``HookChain`` is preserved at the bottom of this file.
 """
+
 from __future__ import annotations
 
 import asyncio
 from collections.abc import Iterator, Sequence
-from typing import Any, Optional, overload
+from typing import Any, overload
 
 from agent_ext.run_context import RunContext, ToolCall, ToolResult
 
 from .base import AgentMiddleware, Hook
-from .exceptions import MiddlewareTimeout, ToolBlocked
-from .permissions import ToolDecision, ToolPermissionResult
-
+from .exceptions import MiddlewareTimeout
+from .permissions import ToolPermissionResult
 
 # ---------------------------------------------------------------------------
 # Helpers
 # ---------------------------------------------------------------------------
 
+
 def _flatten(
-    items: Sequence[AgentMiddleware | "MiddlewareChain"],
+    items: Sequence[AgentMiddleware | MiddlewareChain],
 ) -> list[AgentMiddleware]:
     flat: list[AgentMiddleware] = []
     for item in items:
@@ -34,9 +35,7 @@ def _flatten(
         elif isinstance(item, AgentMiddleware):
             flat.append(item)
         else:
-            raise TypeError(
-                f"Expected AgentMiddleware or MiddlewareChain, got {type(item).__name__}"
-            )
+            raise TypeError(f"Expected AgentMiddleware or MiddlewareChain, got {type(item).__name__}")
     return flat
 
 
@@ -46,13 +45,14 @@ async def _with_timeout(coro, timeout: float | None, mw_name: str, hook_name: st
         return await coro
     try:
         return await asyncio.wait_for(coro, timeout=timeout)
-    except asyncio.TimeoutError:
-        raise MiddlewareTimeout(mw_name, timeout, hook_name)
+    except TimeoutError as e:
+        raise MiddlewareTimeout(mw_name, timeout, hook_name) from e
 
 
 # ---------------------------------------------------------------------------
 # Async MiddlewareChain (parity with pydantic-ai-middleware)
 # ---------------------------------------------------------------------------
+
 
 class MiddlewareChain(AgentMiddleware):
     """A composable, ordered chain of async middleware.
@@ -63,7 +63,7 @@ class MiddlewareChain(AgentMiddleware):
 
     def __init__(
         self,
-        middleware: Sequence[AgentMiddleware | "MiddlewareChain"] | None = None,
+        middleware: Sequence[AgentMiddleware | MiddlewareChain] | None = None,
         *,
         name: str | None = None,
     ) -> None:
@@ -108,7 +108,7 @@ class MiddlewareChain(AgentMiddleware):
     def replace(self, old: AgentMiddleware, new: AgentMiddleware | MiddlewareChain) -> MiddlewareChain:
         idx = self._middleware.index(old)
         if isinstance(new, MiddlewareChain):
-            self._middleware[idx:idx + 1] = new._middleware
+            self._middleware[idx : idx + 1] = new._middleware
         elif isinstance(new, AgentMiddleware):
             self._middleware[idx] = new
         else:
@@ -169,7 +169,9 @@ class MiddlewareChain(AgentMiddleware):
         for mw in self._middleware:
             current = await _with_timeout(
                 mw.before_run(ctx, current),
-                mw.timeout, type(mw).__name__, "before_run",
+                mw.timeout,
+                type(mw).__name__,
+                "before_run",
             )
         return current
 
@@ -178,7 +180,9 @@ class MiddlewareChain(AgentMiddleware):
         for mw in reversed(self._middleware):
             current = await _with_timeout(
                 mw.after_run(ctx, prompt, current),
-                mw.timeout, type(mw).__name__, "after_run",
+                mw.timeout,
+                type(mw).__name__,
+                "after_run",
             )
         return current
 
@@ -187,7 +191,9 @@ class MiddlewareChain(AgentMiddleware):
         for mw in self._middleware:
             current = await _with_timeout(
                 mw.before_model_request(ctx, current),
-                mw.timeout, type(mw).__name__, "before_model_request",
+                mw.timeout,
+                type(mw).__name__,
+                "before_model_request",
             )
         return current
 
@@ -203,7 +209,9 @@ class MiddlewareChain(AgentMiddleware):
                 continue
             result = await _with_timeout(
                 mw.before_tool_call(ctx, tool_name, current_args),
-                mw.timeout, type(mw).__name__, "before_tool_call",
+                mw.timeout,
+                type(mw).__name__,
+                "before_tool_call",
             )
             if isinstance(result, ToolPermissionResult):
                 return result  # short-circuit
@@ -223,7 +231,9 @@ class MiddlewareChain(AgentMiddleware):
                 continue
             current = await _with_timeout(
                 mw.after_tool_call(ctx, tool_name, tool_args, current),
-                mw.timeout, type(mw).__name__, "after_tool_call",
+                mw.timeout,
+                type(mw).__name__,
+                "after_tool_call",
             )
         return current
 
@@ -239,7 +249,9 @@ class MiddlewareChain(AgentMiddleware):
                 continue
             handled = await _with_timeout(
                 mw.on_tool_error(ctx, tool_name, tool_args, error),
-                mw.timeout, type(mw).__name__, "on_tool_error",
+                mw.timeout,
+                type(mw).__name__,
+                "on_tool_error",
             )
             if handled is not None:
                 return handled
@@ -249,7 +261,9 @@ class MiddlewareChain(AgentMiddleware):
         for mw in self._middleware:
             handled = await _with_timeout(
                 mw.on_error(ctx, error),
-                mw.timeout, type(mw).__name__, "on_error",
+                mw.timeout,
+                type(mw).__name__,
+                "on_error",
             )
             if handled is not None:
                 return handled
@@ -259,6 +273,7 @@ class MiddlewareChain(AgentMiddleware):
 # ---------------------------------------------------------------------------
 # Legacy sync HookChain (backward-compat with the old Hook Protocol)
 # ---------------------------------------------------------------------------
+
 
 class HookChain:
     """Sync hook chain (legacy).  Prefer ``MiddlewareChain`` for new code."""
@@ -295,7 +310,7 @@ class HookChain:
             result = h.after_tool_result(ctx, result)
         return result
 
-    def on_error(self, ctx: RunContext, err: Exception) -> Optional[Any]:
+    def on_error(self, ctx: RunContext, err: Exception) -> Any | None:
         for h in reversed(self.hooks):
             maybe = h.on_error(ctx, err)
             if maybe is not None:

@@ -1,5 +1,7 @@
 from __future__ import annotations
+
 from agent_ext.evidence.models import Citation
+
 from .models import OCRSpan
 
 

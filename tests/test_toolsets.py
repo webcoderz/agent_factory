@@ -1,14 +1,14 @@
 """Tests for all FunctionToolset factories."""
+
 from __future__ import annotations
 
-import pytest
 from pydantic_ai.toolsets import FunctionToolset
 
-from agent_ext.rlm.toolset import create_rlm_toolset, cleanup_repl_environments
-from agent_ext.database.toolset import create_database_toolset, SQLDatabaseDeps
-from agent_ext.backends.console import create_console_toolset, ConsoleDeps
-from agent_ext.subagents.toolset import create_subagent_toolset, SubAgentDeps
-from agent_ext.todo.pai_toolset import create_todo_toolset, TodoDeps
+from agent_ext.backends.console import ConsoleDeps, create_console_toolset
+from agent_ext.database.toolset import SQLDatabaseDeps, create_database_toolset
+from agent_ext.rlm.toolset import cleanup_repl_environments, create_rlm_toolset
+from agent_ext.subagents.toolset import SubAgentDeps, create_subagent_toolset
+from agent_ext.todo.pai_toolset import TodoDeps, create_todo_toolset
 
 
 class TestRLMToolset:
@@ -49,7 +49,8 @@ class TestConsoleToolset:
         assert isinstance(ts, FunctionToolset)
 
     def test_deps_model(self):
-        from agent_ext.backends import StateBackend, PERMISSIVE_RULESET
+        from agent_ext.backends import StateBackend
+
         backend = StateBackend()
         deps = ConsoleDeps(backend=backend, exec_enabled=False)
         assert deps.exec_enabled is False
@@ -63,7 +64,9 @@ class TestSubagentToolset:
     def test_with_configs(self):
         """Config compilation requires valid model — test with env var or skip."""
         import os
+
         from agent_ext.subagents import SubAgentConfig
+
         configs = [
             SubAgentConfig(name="helper", description="Helps", instructions="Be helpful"),
         ]

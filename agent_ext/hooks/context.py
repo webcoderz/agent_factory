@@ -5,6 +5,7 @@ Provides a context system with strict access controls:
 - Each hook can only *read* from earlier hooks in the execution chain
 - ``on_error`` / ``on_tool_error`` can read everything
 """
+
 from __future__ import annotations
 
 from collections.abc import Mapping
@@ -83,8 +84,7 @@ class ScopedContext:
         """Get a value from another hook's namespace (respecting access control)."""
         if not self._can_read(hook):
             raise ContextAccessError(
-                f"Hook '{self._current_hook.name}' cannot read from "
-                f"'{hook.name}' (later in execution chain)"
+                f"Hook '{self._current_hook.name}' cannot read from '{hook.name}' (later in execution chain)"
             )
         return self._parent._get_hook_data(hook, key, default)
 
@@ -92,8 +92,7 @@ class ScopedContext:
         """Get all data from a hook's namespace."""
         if not self._can_read(hook):
             raise ContextAccessError(
-                f"Hook '{self._current_hook.name}' cannot read from "
-                f"'{hook.name}' (later in execution chain)"
+                f"Hook '{self._current_hook.name}' cannot read from '{hook.name}' (later in execution chain)"
             )
         return self._parent._get_all_hook_data(hook)
 
@@ -103,8 +102,7 @@ class ScopedContext:
     def has_key_in(self, hook: HookType, key: str) -> bool:
         if not self._can_read(hook):
             raise ContextAccessError(
-                f"Hook '{self._current_hook.name}' cannot read from "
-                f"'{hook.name}' (later in execution chain)"
+                f"Hook '{self._current_hook.name}' cannot read from '{hook.name}' (later in execution chain)"
             )
         return self._parent._has_hook_key(hook, key)
 

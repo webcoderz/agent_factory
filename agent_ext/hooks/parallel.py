@@ -8,17 +8,16 @@ Aggregation strategies control how results are combined:
 - FIRST_WINS: first non-exception result is used
 - MERGE: combine all results (for dict-like outputs)
 """
+
 from __future__ import annotations
 
 import asyncio
 from collections.abc import Sequence
-from enum import Enum
 from typing import Any
 
 from agent_ext.run_context import RunContext
 
 from .base import AgentMiddleware
-from .context import HookType, MiddlewareContext
 from .exceptions import ParallelExecutionFailed
 from .strategies import AggregationStrategy
 
@@ -106,18 +105,14 @@ class ParallelMiddleware(AgentMiddleware):
         coros = [mw.before_model_request(ctx, messages) for mw in self._middleware]
         return await self._run_parallel("before_model_request", coros, messages)
 
-    async def before_tool_call(
-        self, ctx: RunContext, tool_name: str, tool_args: dict[str, Any]
-    ) -> dict[str, Any]:
+    async def before_tool_call(self, ctx: RunContext, tool_name: str, tool_args: dict[str, Any]) -> dict[str, Any]:
         applicable = [mw for mw in self._middleware if mw._should_handle_tool(tool_name)]
         if not applicable:
             return tool_args
         coros = [mw.before_tool_call(ctx, tool_name, tool_args) for mw in applicable]
         return await self._run_parallel("before_tool_call", coros, tool_args)
 
-    async def after_tool_call(
-        self, ctx: RunContext, tool_name: str, tool_args: dict[str, Any], result: Any
-    ) -> Any:
+    async def after_tool_call(self, ctx: RunContext, tool_name: str, tool_args: dict[str, Any], result: Any) -> Any:
         applicable = [mw for mw in self._middleware if mw._should_handle_tool(tool_name)]
         if not applicable:
             return result

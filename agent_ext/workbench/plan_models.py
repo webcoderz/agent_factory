@@ -2,6 +2,7 @@
 Structured plan output: LLM returns a list of tasks (kind, title, input)
 so planning is dynamic (e.g. skip analyze for small changes, add multiple searches).
 """
+
 from __future__ import annotations
 
 from typing import Literal
@@ -16,7 +17,9 @@ class TaskSpec(BaseModel):
         description="analyze=clarify goal, search=find relevant code, design=approach+file list, implement=create patch, gates=run tests"
     )
     title: str = Field(description="Short human-readable title for this step")
-    input: str = Field(default="", description="Input for the task: usually the goal, or a specific search query for search tasks")
+    input: str = Field(
+        default="", description="Input for the task: usually the goal, or a specific search query for search tasks"
+    )
 
 
 class PlanOutput(BaseModel):

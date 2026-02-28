@@ -1,11 +1,11 @@
 """Pydantic models and data types for the RLM system."""
+
 from __future__ import annotations
 
 from dataclasses import dataclass, field
 from typing import Any
 
 from pydantic import BaseModel, Field
-
 
 # ---------------------------------------------------------------------------
 # Configuration
@@ -27,11 +27,23 @@ class RLMConfig:
     sub_model: str | None = None
     """Model for llm_query() within the REPL environment."""
 
-    allow_imports: list[str] = field(default_factory=lambda: [
-        "math", "json", "re", "statistics", "collections",
-        "itertools", "functools", "operator", "string",
-        "textwrap", "datetime", "hashlib", "csv",
-    ])
+    allow_imports: list[str] = field(
+        default_factory=lambda: [
+            "math",
+            "json",
+            "re",
+            "statistics",
+            "collections",
+            "itertools",
+            "functools",
+            "operator",
+            "string",
+            "textwrap",
+            "datetime",
+            "hashlib",
+            "csv",
+        ]
+    )
     """Modules the REPL is allowed to import."""
 
 
@@ -53,6 +65,7 @@ class RLMDependencies:
 # ---------------------------------------------------------------------------
 # Results
 # ---------------------------------------------------------------------------
+
 
 @dataclass
 class REPLResult:
@@ -78,6 +91,7 @@ class REPLResult:
 # Grounded response (citations)
 # ---------------------------------------------------------------------------
 
+
 class GroundedResponse(BaseModel):
     """A response with citation markers mapping to exact quotes from source documents.
 
@@ -88,6 +102,7 @@ class GroundedResponse(BaseModel):
             grounding={"1": "increased by 45%", "2": "new markets in Asia"},
         )
     """
+
     info: str = Field(description="Response text with citation markers like [1]")
     grounding: dict[str, str] = Field(
         default_factory=dict,

@@ -1,10 +1,11 @@
 """Prefixed registry — namespace skills with a prefix."""
+
 from __future__ import annotations
 
-from typing import List
+import builtins
 
-from ..models import SkillSpec
 from ..exceptions import SkillNotFoundError
+from ..models import SkillSpec
 
 
 class PrefixedRegistry:
@@ -33,19 +34,19 @@ class PrefixedRegistry:
             metadata=spec.metadata,
         )
 
-    def list(self) -> List[SkillSpec]:
+    def list(self) -> builtins.list[SkillSpec]:
         return [self._prefixed(s) for s in self._inner.list()]
 
     def get(self, skill_id: str) -> SkillSpec:
         if not skill_id.startswith(self._prefix):
             raise SkillNotFoundError(skill_id)
-        inner_id = skill_id[len(self._prefix):]
+        inner_id = skill_id[len(self._prefix) :]
         return self._prefixed(self._inner.get(inner_id))
 
     def has(self, skill_id: str) -> bool:
         if not skill_id.startswith(self._prefix):
             return False
-        inner_id = skill_id[len(self._prefix):]
+        inner_id = skill_id[len(self._prefix) :]
         try:
             self._inner.get(inner_id)
             return True

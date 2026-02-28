@@ -1,9 +1,7 @@
 from __future__ import annotations
 
-import os
 import re
 from dataclasses import dataclass
-from typing import Iterable, List, Optional
 
 _WORD_RE = re.compile(r"[A-Za-z_][A-Za-z_0-9]{1,}|[0-9]+")
 
@@ -11,11 +9,11 @@ _WORD_RE = re.compile(r"[A-Za-z_][A-Za-z_0-9]{1,}|[0-9]+")
 @dataclass
 class TokenizerConfig:
     use_tiktoken: bool = False
-    tiktoken_encoding: str = "o200k_base"   # override if needed
-    max_tokens_per_doc: int = 20000         # prevent indexing huge blobs
+    tiktoken_encoding: str = "o200k_base"  # override if needed
+    max_tokens_per_doc: int = 20000  # prevent indexing huge blobs
 
 
-def _regex_tokens(text: str) -> List[str]:
+def _regex_tokens(text: str) -> list[str]:
     return [m.group(0).lower() for m in _WORD_RE.finditer(text)]
 
 
@@ -28,17 +26,19 @@ class Tokenizer:
       - Default to regex word tokens (fast, good for BM25)
       - Optionally augment with tiktoken token strings (configurable)
     """
+
     def __init__(self, cfg: TokenizerConfig):
         self.cfg = cfg
         self._enc = None
         if cfg.use_tiktoken:
             try:
                 import tiktoken  # type: ignore
+
                 self._enc = tiktoken.get_encoding(cfg.tiktoken_encoding)
             except Exception:
                 self._enc = None  # silently fall back
 
-    def tokenize(self, text: str) -> List[str]:
+    def tokenize(self, text: str) -> list[str]:
         toks = _regex_tokens(text)
 
         if self._enc is not None:

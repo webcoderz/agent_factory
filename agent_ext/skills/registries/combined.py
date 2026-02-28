@@ -1,10 +1,11 @@
 """Combined registry — merge multiple registries into one."""
+
 from __future__ import annotations
 
-from typing import List
+import builtins
 
-from ..models import SkillSpec
 from ..exceptions import SkillNotFoundError
+from ..models import SkillSpec
 
 
 class CombinedRegistry:
@@ -13,7 +14,7 @@ class CombinedRegistry:
     def __init__(self, registries: list) -> None:
         self._registries = list(registries)
 
-    def list(self) -> List[SkillSpec]:
+    def list(self) -> builtins.list[SkillSpec]:
         seen: set[str] = set()
         result: list[SkillSpec] = []
         for reg in self._registries:
@@ -33,6 +34,5 @@ class CombinedRegistry:
 
     def has(self, skill_id: str) -> bool:
         return any(
-            (hasattr(r, "has") and r.has(skill_id)) or skill_id in {s.id for s in r.list()}
-            for r in self._registries
+            (hasattr(r, "has") and r.has(skill_id)) or skill_id in {s.id for s in r.list()} for r in self._registries
         )

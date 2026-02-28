@@ -1,12 +1,14 @@
 from __future__ import annotations
-from typing import Any, Dict, List
+
+from typing import Any
 
 from .subagents import SubagentResult
+
 
 class BM25SearchSubagent:
     name = "bm25"
 
-    async def run(self, ctx, *, input: Any, meta: Dict[str, Any]) -> SubagentResult:
+    async def run(self, ctx, *, input: Any, meta: dict[str, Any]) -> SubagentResult:
         query = str(input).strip()
         k = int(meta.get("k", 20))
         hits = ctx.search.search(query, top_k=k)  # [(path, score)]

@@ -1,4 +1,5 @@
 """Exceptions for the skills system."""
+
 from __future__ import annotations
 
 

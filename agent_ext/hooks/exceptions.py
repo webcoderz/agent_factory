@@ -3,9 +3,10 @@
 Covers input/output blocking, tool blocking, permissions, budgets,
 timeouts, parallel execution failures, and aggregation errors.
 """
+
 from __future__ import annotations
 
-from typing import Any, Optional
+from typing import Any
 
 
 class MiddlewareError(Exception):
@@ -20,10 +21,11 @@ class MiddlewareConfigError(MiddlewareError):
 # Blocking
 # ---------------------------------------------------------------------------
 
+
 class InputBlocked(MiddlewareError):
     """Raised by *before_run* or *before_model_request* to block a prompt."""
 
-    def __init__(self, reason: str = "Input blocked", *, matched_rule: Optional[str] = None, details: Any = None):
+    def __init__(self, reason: str = "Input blocked", *, matched_rule: str | None = None, details: Any = None):
         self.reason = reason
         self.matched_rule = matched_rule
         self.details = details
@@ -51,6 +53,7 @@ class OutputBlocked(MiddlewareError):
 # Budget / cost
 # ---------------------------------------------------------------------------
 
+
 class BudgetExceededError(MiddlewareError):
     """Raised when accumulated cost exceeds the configured budget limit."""
 
@@ -63,6 +66,7 @@ class BudgetExceededError(MiddlewareError):
 # ---------------------------------------------------------------------------
 # Timeouts
 # ---------------------------------------------------------------------------
+
 
 class MiddlewareTimeout(MiddlewareError):
     """Raised when a middleware hook exceeds its configured timeout."""
@@ -87,6 +91,7 @@ class GuardrailTimeout(MiddlewareError):
 # ---------------------------------------------------------------------------
 # Parallel execution
 # ---------------------------------------------------------------------------
+
 
 class ParallelExecutionFailed(MiddlewareError):
     """Raised when parallel middleware execution fails."""

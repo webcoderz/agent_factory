@@ -1,10 +1,12 @@
 from __future__ import annotations
 
 import asyncio
+import builtins
 import re
+from collections.abc import Awaitable
 from dataclasses import dataclass
 from pathlib import Path
-from typing import Any, Awaitable, Callable, Dict, List, Optional, Protocol
+from typing import Any, Protocol
 
 from .parallel import gather_bounded
 
@@ -14,17 +16,18 @@ class SubagentResult:
     ok: bool
     name: str
     output: Any
-    meta: Dict[str, Any]
+    meta: dict[str, Any]
 
 
 class Subagent(Protocol):
     name: str
-    async def run(self, ctx, *, input: Any, meta: Dict[str, Any]) -> SubagentResult: ...
+
+    async def run(self, ctx, *, input: Any, meta: dict[str, Any]) -> SubagentResult: ...
 
 
 class SubagentRegistry:
     def __init__(self):
-        self._agents: Dict[str, Subagent] = {}
+        self._agents: dict[str, Subagent] = {}
 
     def register(self, agent: Subagent) -> None:
         self._agents[agent.name] = agent
@@ -34,7 +37,7 @@ class SubagentRegistry:
             raise KeyError(f"Unknown subagent: {name}")
         return self._agents[name]
 
-    def list(self) -> List[str]:
+    def list(self) -> builtins.list[str]:
         return sorted(self._agents.keys())
 
 
@@ -45,11 +48,11 @@ class SubagentOrchestrator:
     async def run_many(
         self,
         ctx,
-        calls: List[tuple[str, Any, Dict[str, Any]]],
+        calls: list[tuple[str, Any, dict[str, Any]]],
         *,
         max_concurrency: int = 4,
-    ) -> List[SubagentResult]:
-        coros: List[Awaitable[SubagentResult]] = []
+    ) -> list[SubagentResult]:
+        coros: list[Awaitable[SubagentResult]] = []
         for name, inp, meta in calls:
             agent = self.registry.get(name)
             coros.append(agent.run(ctx, input=inp, meta=meta))
@@ -60,18 +63,20 @@ class SubagentOrchestrator:
 # Built-in starter subagents
 # ----------------------------
 
+
 class RepoGrepSubagent:
     """
     Deterministic: searches repo for keywords/regex. Cheap. Great parallel companion.
     """
+
     name = "repo_grep"
 
-    async def run(self, ctx, *, input: Any, meta: Dict[str, Any]) -> SubagentResult:
+    async def run(self, ctx, *, input: Any, meta: dict[str, Any]) -> SubagentResult:
         query = str(input).strip()
         root = Path(meta.get("root", "."))
         pattern = meta.get("regex", False)
 
-        hits: List[dict] = []
+        hits: list[dict] = []
         rx = re.compile(query) if pattern else None
 
         # small async yield to keep loop responsive
@@ -96,7 +101,7 @@ class RepoGrepSubagent:
         return SubagentResult(ok=True, name=self.name, output=hits, meta={"query": query, "count": len(hits)})
 
 
-def _default_plan(goal: str) -> List[Dict[str, Any]]:
+def _default_plan(goal: str) -> list[dict[str, Any]]:
     """Fallback when no model or LLM plan fails: fixed sequence."""
     return [
         {"kind": "analyze", "title": "Clarify goal", "input": goal},
@@ -113,9 +118,10 @@ class PlannerSubagent:
     choose task sequence (e.g. skip analyze for small edits, add multiple searches).
     Falls back to a fixed plan when no model or validation fails.
     """
+
     name = "planner"
 
-    async def run(self, ctx, *, input: Any, meta: Dict[str, Any]) -> SubagentResult:
+    async def run(self, ctx, *, input: Any, meta: dict[str, Any]) -> SubagentResult:
         goal = str(input).strip()
         if not goal:
             return SubagentResult(ok=True, name=self.name, output=[], meta={"goal": goal, "count": 0})
@@ -123,6 +129,7 @@ class PlannerSubagent:
         if getattr(ctx, "model", None) is not None:
             try:
                 from pydantic_ai import Agent
+
                 from .plan_models import PlanOutput, plan_output_to_tasks
 
                 prompt = f"""Given this development goal, output a minimal ordered plan of tasks.

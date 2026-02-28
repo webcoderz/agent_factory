@@ -9,31 +9,33 @@ Run:
   Set OCR_DEMO_PDF to a PDF path and OPENAI_API_KEY; then from repo root:
   uv run python -m agent_ext.examples.ocr_with_agent_demo
 """
+
 from __future__ import annotations
 
 import os
-import uuid
-from typing import Any, Dict
 
 # Add parent so agent_ext is importable when run as script
 import sys
+import uuid
 from pathlib import Path
+from typing import Any
+
 _root = Path(__file__).resolve().parent.parent.parent
 if _root not in (Path(p).resolve() for p in sys.path):
     sys.path.insert(0, str(_root))
 
 from agent_ext import (
-    PydanticAIAgentBase,
-    IngestPipeline,
     DocumentInput,
+    IngestPipeline,
     IngestResult,
-    PDFToImages,
     LLMVisionOCREngine,
     PageOCROutput,
+    PDFToImages,
+    PydanticAIAgentBase,
 )
-from agent_ext.run_context import RunContext, Policy
 from agent_ext.ingest.extractors import MarkdownDumpExtractor
 from agent_ext.ingest.pdf2image_renderer import Pdf2ImageRenderer
+from agent_ext.run_context import Policy, RunContext
 
 
 # -----------------------------------------------------------------------------
@@ -41,10 +43,10 @@ from agent_ext.ingest.pdf2image_renderer import Pdf2ImageRenderer
 # -----------------------------------------------------------------------------
 class InMemoryArtifactStore:
     def __init__(self) -> None:
-        self._bytes_store: Dict[str, bytes] = {}
-        self._metadata: Dict[str, Dict[str, Any]] = {}
+        self._bytes_store: dict[str, bytes] = {}
+        self._metadata: dict[str, dict[str, Any]] = {}
 
-    def put_bytes(self, content: bytes, *, metadata: Dict[str, Any]) -> str:
+    def put_bytes(self, content: bytes, *, metadata: dict[str, Any]) -> str:
         aid = str(uuid.uuid4())
         self._bytes_store[aid] = content
         self._metadata[aid] = metadata
@@ -53,15 +55,17 @@ class InMemoryArtifactStore:
     def get_bytes(self, artifact_id: str) -> bytes:
         return self._bytes_store[artifact_id]
 
-    def put_json(self, obj: Dict[str, Any], *, metadata: Dict[str, Any]) -> str:
+    def put_json(self, obj: dict[str, Any], *, metadata: dict[str, Any]) -> str:
         import json
+
         aid = str(uuid.uuid4())
         self._bytes_store[aid] = json.dumps(obj).encode("utf-8")
         self._metadata[aid] = metadata
         return aid
 
-    def get_json(self, artifact_id: str) -> Dict[str, Any]:
+    def get_json(self, artifact_id: str) -> dict[str, Any]:
         import json
+
         return json.loads(self._bytes_store[artifact_id].decode("utf-8"))
 
 
@@ -103,7 +107,9 @@ class OCRAgent(PydanticAIAgentBase[PageOCROutput]):
 def main() -> None:
     pdf_path = os.environ.get("OCR_DEMO_PDF")
     if not pdf_path or not Path(pdf_path).exists():
-        print("Set OCR_DEMO_PDF to a PDF path. Example: OCR_DEMO_PDF=./sample.pdf uv run python -m agent_ext.examples.ocr_with_agent_demo")
+        print(
+            "Set OCR_DEMO_PDF to a PDF path. Example: OCR_DEMO_PDF=./sample.pdf uv run python -m agent_ext.examples.ocr_with_agent_demo"
+        )
         return
 
     artifacts = InMemoryArtifactStore()

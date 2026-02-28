@@ -14,6 +14,7 @@ Example::
     deps = SQLDatabaseDeps(database=db)
     result = await agent.run("What tables are in the database?", deps=deps)
 """
+
 from __future__ import annotations
 
 import asyncio
@@ -22,9 +23,6 @@ from typing import Annotated, Any
 from pydantic import BaseModel, ConfigDict, SkipValidation
 from pydantic_ai import RunContext
 from pydantic_ai.toolsets import FunctionToolset
-
-from .protocol import DatabaseBackend
-from .types import QueryResult, SchemaInfo, TableInfo
 
 DATABASE_SYSTEM_PROMPT = """
 ## Database Toolset
@@ -48,6 +46,7 @@ You have access to database tools:
 
 class SQLDatabaseDeps(BaseModel):
     """Dependencies for the database toolset."""
+
     model_config = ConfigDict(arbitrary_types_allowed=True)
 
     database: Annotated[Any, SkipValidation]  # DatabaseBackend
@@ -114,7 +113,7 @@ def create_database_toolset(*, toolset_id: str | None = None) -> FunctionToolset
                 ctx.deps.database.execute_query(sql_query),
                 timeout=ctx.deps.query_timeout,
             )
-        except asyncio.TimeoutError:
+        except TimeoutError:
             return f"Error: Query timed out after {ctx.deps.query_timeout}s"
 
         if result.error:
@@ -125,7 +124,7 @@ def create_database_toolset(*, toolset_id: str | None = None) -> FunctionToolset
 
         # Format as table
         if len(result.rows) > ctx.deps.max_rows:
-            rows = result.rows[:ctx.deps.max_rows]
+            rows = result.rows[: ctx.deps.max_rows]
             truncated = True
         else:
             rows = result.rows

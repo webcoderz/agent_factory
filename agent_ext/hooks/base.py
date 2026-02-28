@@ -10,11 +10,12 @@ The new ``AgentMiddleware`` ABC is the primary base:
 The old ``Hook`` sync Protocol is kept for backward-compat but users
 should migrate to ``AgentMiddleware``.
 """
+
 from __future__ import annotations
 
 from abc import ABC
 from collections.abc import Sequence
-from typing import Any, Optional, Protocol
+from typing import Any, Protocol
 
 from agent_ext.run_context import RunContext, ToolCall, ToolResult
 
@@ -32,12 +33,12 @@ from .exceptions import (  # noqa: F401
     ToolBlocked,
 )
 
-
 # ---------------------------------------------------------------------------
 # New async ABC (parity with pydantic-ai-middleware)
 # ---------------------------------------------------------------------------
 
-class AgentMiddleware(ABC):
+
+class AgentMiddleware(ABC):  # noqa: B024
     """Async middleware base class.
 
     Override only the hooks you need.  ``before_*`` hooks run in order,
@@ -109,6 +110,7 @@ class AgentMiddleware(ABC):
 # Legacy sync Protocol (backward-compat)
 # ---------------------------------------------------------------------------
 
+
 class Hook(Protocol):
     """Sync hook protocol (legacy).  Prefer ``AgentMiddleware`` for new code."""
 
@@ -118,4 +120,4 @@ class Hook(Protocol):
     def after_model_response(self, ctx: RunContext, response: Any) -> Any: ...
     def before_tool_call(self, ctx: RunContext, call: ToolCall) -> ToolCall: ...
     def after_tool_result(self, ctx: RunContext, result: ToolResult) -> ToolResult: ...
-    def on_error(self, ctx: RunContext, err: Exception) -> Optional[Any]: ...
+    def on_error(self, ctx: RunContext, err: Exception) -> Any | None: ...

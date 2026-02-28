@@ -1,19 +1,14 @@
 """Tests for agent_ext.self_improve.patching — diff sanitization, hunk repair, and apply."""
+
 from __future__ import annotations
 
-import os
-import re
 import subprocess
 import tempfile
 from pathlib import Path
 
-import pytest
-
 from agent_ext.self_improve.patching import (
     _HUNK_HEADER_RE,
-    _extract_diff_from_lines,
     _repair_hunk_headers,
-    _normalize_diff_paths,
     apply_unified_diff,
     sanitize_diff_for_apply,
 )
@@ -24,10 +19,10 @@ from agent_ext.workbench.patch_models import (
     structured_to_unified_diff,
 )
 
-
 # ---------------------------------------------------------------------------
 # Helpers
 # ---------------------------------------------------------------------------
+
 
 def _make_git_repo(tmp: Path, files: dict[str, str] | None = None) -> Path:
     """Create a temp git repo with initial files and return its path."""
@@ -47,6 +42,7 @@ def _make_git_repo(tmp: Path, files: dict[str, str] | None = None) -> Path:
 # ---------------------------------------------------------------------------
 # 1. Hunk header regex
 # ---------------------------------------------------------------------------
+
 
 class TestHunkHeaderRegex:
     def test_matches_standard_headers(self):
@@ -69,42 +65,23 @@ class TestHunkHeaderRegex:
 # 2. _repair_hunk_headers
 # ---------------------------------------------------------------------------
 
+
 class TestRepairHunkHeaders:
     def test_valid_headers_pass_through(self):
         """Already-valid hunk headers should not be altered."""
-        diff = (
-            "--- a/foo.py\n"
-            "+++ b/foo.py\n"
-            "@@ -1,3 +1,3 @@\n"
-            " line1\n"
-            "-old\n"
-            "+new\n"
-        )
+        diff = "--- a/foo.py\n+++ b/foo.py\n@@ -1,3 +1,3 @@\n line1\n-old\n+new\n"
         repaired = _repair_hunk_headers(diff)
         assert "@@ -1,3 +1,3 @@" in repaired
 
     def test_bare_hunk_repaired(self):
         """Bare @@ gets rewritten with correct counts."""
-        diff = (
-            "--- a/foo.py\n"
-            "+++ b/foo.py\n"
-            "@@\n"
-            " context\n"
-            "-old\n"
-            "+new\n"
-        )
+        diff = "--- a/foo.py\n+++ b/foo.py\n@@\n context\n-old\n+new\n"
         repaired = _repair_hunk_headers(diff)
         assert "@@ -1,2 +1,2 @@" in repaired
 
     def test_new_file_bare_hunk_repaired(self):
         """Bare @@ after --- /dev/null gets @@ -0,0 +1,N @@."""
-        diff = (
-            "--- /dev/null\n"
-            "+++ b/new.py\n"
-            "@@\n"
-            "+line1\n"
-            "+line2\n"
-        )
+        diff = "--- /dev/null\n+++ b/new.py\n@@\n+line1\n+line2\n"
         repaired = _repair_hunk_headers(diff)
         assert "@@ -0,0 +1,2 @@" in repaired
 
@@ -113,16 +90,10 @@ class TestRepairHunkHeaders:
 # 3. sanitize_diff_for_apply
 # ---------------------------------------------------------------------------
 
+
 class TestSanitizeDiff:
     def test_well_formed_diff_unchanged(self):
-        diff = (
-            "--- a/foo.py\n"
-            "+++ b/foo.py\n"
-            "@@ -1,3 +1,3 @@\n"
-            " def hello():\n"
-            '-    return "old"\n'
-            '+    return "new"\n'
-        )
+        diff = '--- a/foo.py\n+++ b/foo.py\n@@ -1,3 +1,3 @@\n def hello():\n-    return "old"\n+    return "new"\n'
         sanitized = sanitize_diff_for_apply(diff)
         assert "--- a/foo.py" in sanitized
         assert "+++ b/foo.py" in sanitized
@@ -186,38 +157,43 @@ class TestSanitizeDiff:
 # 4. structured_to_unified_diff
 # ---------------------------------------------------------------------------
 
+
 class TestStructuredToUnifiedDiff:
     def test_basic_edit(self):
-        patch = PatchOutput(files=[
-            FilePatch(
-                path="src/foo.py",
-                is_new_file=False,
-                lines=[
-                    LineChange(kind="context", content="def hello():"),
-                    LineChange(kind="remove", content='    return "old"'),
-                    LineChange(kind="add", content='    return "new"'),
-                ],
-            )
-        ])
+        patch = PatchOutput(
+            files=[
+                FilePatch(
+                    path="src/foo.py",
+                    is_new_file=False,
+                    lines=[
+                        LineChange(kind="context", content="def hello():"),
+                        LineChange(kind="remove", content='    return "old"'),
+                        LineChange(kind="add", content='    return "new"'),
+                    ],
+                )
+            ]
+        )
         diff = structured_to_unified_diff(patch)
         assert "diff --git a/src/foo.py b/src/foo.py" in diff
         assert "--- a/src/foo.py" in diff
         assert "+++ b/src/foo.py" in diff
-        assert '@@ -1,2 +1,2 @@' in diff
+        assert "@@ -1,2 +1,2 @@" in diff
         assert '-    return "old"' in diff
         assert '+    return "new"' in diff
 
     def test_new_file(self):
-        patch = PatchOutput(files=[
-            FilePatch(
-                path="src/new.py",
-                is_new_file=True,
-                lines=[
-                    LineChange(kind="add", content="# new module"),
-                    LineChange(kind="add", content="def fn(): pass"),
-                ],
-            )
-        ])
+        patch = PatchOutput(
+            files=[
+                FilePatch(
+                    path="src/new.py",
+                    is_new_file=True,
+                    lines=[
+                        LineChange(kind="add", content="# new module"),
+                        LineChange(kind="add", content="def fn(): pass"),
+                    ],
+                )
+            ]
+        )
         diff = structured_to_unified_diff(patch)
         assert "diff --git a/src/new.py b/src/new.py" in diff
         assert "new file mode 100644" in diff
@@ -226,16 +202,26 @@ class TestStructuredToUnifiedDiff:
         assert "@@ -0,0 +1,2 @@" in diff
 
     def test_multi_file(self):
-        patch = PatchOutput(files=[
-            FilePatch(path="a.py", is_new_file=False, lines=[
-                LineChange(kind="context", content="x = 1"),
-                LineChange(kind="remove", content="y = 2"),
-                LineChange(kind="add", content="y = 3"),
-            ]),
-            FilePatch(path="b.py", is_new_file=True, lines=[
-                LineChange(kind="add", content="z = 42"),
-            ]),
-        ])
+        patch = PatchOutput(
+            files=[
+                FilePatch(
+                    path="a.py",
+                    is_new_file=False,
+                    lines=[
+                        LineChange(kind="context", content="x = 1"),
+                        LineChange(kind="remove", content="y = 2"),
+                        LineChange(kind="add", content="y = 3"),
+                    ],
+                ),
+                FilePatch(
+                    path="b.py",
+                    is_new_file=True,
+                    lines=[
+                        LineChange(kind="add", content="z = 42"),
+                    ],
+                ),
+            ]
+        )
         diff = structured_to_unified_diff(patch)
         assert "diff --git a/a.py b/a.py" in diff
         assert "diff --git a/b.py b/b.py" in diff
@@ -250,17 +236,24 @@ class TestStructuredToUnifiedDiff:
 # 5. End-to-end: structured → unified → git apply
 # ---------------------------------------------------------------------------
 
+
 class TestApplyStructuredDiff:
     def test_edit_existing_file(self):
         with tempfile.TemporaryDirectory() as td:
             repo = _make_git_repo(Path(td), {"src/foo.py": 'def hello():\n    return "old"\n'})
-            patch = PatchOutput(files=[
-                FilePatch(path="src/foo.py", is_new_file=False, lines=[
-                    LineChange(kind="context", content="def hello():"),
-                    LineChange(kind="remove", content='    return "old"'),
-                    LineChange(kind="add", content='    return "new"'),
-                ]),
-            ])
+            patch = PatchOutput(
+                files=[
+                    FilePatch(
+                        path="src/foo.py",
+                        is_new_file=False,
+                        lines=[
+                            LineChange(kind="context", content="def hello():"),
+                            LineChange(kind="remove", content='    return "old"'),
+                            LineChange(kind="add", content='    return "new"'),
+                        ],
+                    ),
+                ]
+            )
             diff = structured_to_unified_diff(patch)
             ok, err = apply_unified_diff(diff, repo_root=repo)
             assert ok, f"git apply failed: {err}"
@@ -270,12 +263,18 @@ class TestApplyStructuredDiff:
     def test_create_new_file(self):
         with tempfile.TemporaryDirectory() as td:
             repo = _make_git_repo(Path(td), {"src/existing.py": "x = 1\n"})
-            patch = PatchOutput(files=[
-                FilePatch(path="src/brand_new.py", is_new_file=True, lines=[
-                    LineChange(kind="add", content="def new_fn():"),
-                    LineChange(kind="add", content="    return 42"),
-                ]),
-            ])
+            patch = PatchOutput(
+                files=[
+                    FilePatch(
+                        path="src/brand_new.py",
+                        is_new_file=True,
+                        lines=[
+                            LineChange(kind="add", content="def new_fn():"),
+                            LineChange(kind="add", content="    return 42"),
+                        ],
+                    ),
+                ]
+            )
             diff = structured_to_unified_diff(patch)
             ok, err = apply_unified_diff(diff, repo_root=repo)
             assert ok, f"git apply failed: {err}"
@@ -285,19 +284,32 @@ class TestApplyStructuredDiff:
 
     def test_multi_file_edit_and_create(self):
         with tempfile.TemporaryDirectory() as td:
-            repo = _make_git_repo(Path(td), {
-                "src/a.py": "x = 1\ny = 2\n",
-            })
-            patch = PatchOutput(files=[
-                FilePatch(path="src/a.py", is_new_file=False, lines=[
-                    LineChange(kind="context", content="x = 1"),
-                    LineChange(kind="remove", content="y = 2"),
-                    LineChange(kind="add", content="y = 3"),
-                ]),
-                FilePatch(path="src/b.py", is_new_file=True, lines=[
-                    LineChange(kind="add", content="z = 42"),
-                ]),
-            ])
+            repo = _make_git_repo(
+                Path(td),
+                {
+                    "src/a.py": "x = 1\ny = 2\n",
+                },
+            )
+            patch = PatchOutput(
+                files=[
+                    FilePatch(
+                        path="src/a.py",
+                        is_new_file=False,
+                        lines=[
+                            LineChange(kind="context", content="x = 1"),
+                            LineChange(kind="remove", content="y = 2"),
+                            LineChange(kind="add", content="y = 3"),
+                        ],
+                    ),
+                    FilePatch(
+                        path="src/b.py",
+                        is_new_file=True,
+                        lines=[
+                            LineChange(kind="add", content="z = 42"),
+                        ],
+                    ),
+                ]
+            )
             diff = structured_to_unified_diff(patch)
             ok, err = apply_unified_diff(diff, repo_root=repo)
             assert ok, f"git apply failed: {err}"

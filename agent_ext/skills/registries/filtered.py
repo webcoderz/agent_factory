@@ -1,11 +1,12 @@
 """Filtered registry — expose only skills matching criteria."""
+
 from __future__ import annotations
 
+import builtins
 from collections.abc import Callable
-from typing import List
 
-from ..models import SkillSpec
 from ..exceptions import SkillNotFoundError
+from ..models import SkillSpec
 
 
 class FilteredRegistry:
@@ -24,7 +25,7 @@ class FilteredRegistry:
         self._inner = inner
         self._predicate = predicate
 
-    def list(self) -> List[SkillSpec]:
+    def list(self) -> builtins.list[SkillSpec]:
         return [s for s in self._inner.list() if self._predicate(s)]
 
     def get(self, skill_id: str) -> SkillSpec:

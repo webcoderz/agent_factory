@@ -1,3 +1,3 @@
-from .bm25 import BM25Index, BM25Config
-from .tokenize import TokenizerConfig
+from .bm25 import BM25Config, BM25Index
 from .index import RepoIndexerConfig
+from .tokenize import TokenizerConfig

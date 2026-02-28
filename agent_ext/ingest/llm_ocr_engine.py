@@ -4,12 +4,13 @@ OCR per page by sending page images and receiving structured or plain text.
 Pattern aligned with vision OCR (e.g. PDF → images → LLM per page → structured output);
 see README §10 and pydantic-ai OCR examples for the idea.
 """
+
 from __future__ import annotations
 
-from typing import Any, List, Optional, Protocol
+from typing import Any, Protocol
 
+from agent_ext.ingest.models import OCRPage, PageImage
 from agent_ext.run_context import RunContext
-from agent_ext.ingest.models import PageImage, OCRPage
 
 try:
     from pydantic_ai import BinaryContent
@@ -19,6 +20,7 @@ except ImportError:
 
 class _AgentLike(Protocol):
     """Agent that accepts run_sync(ctx, message) with message as list (e.g. prompt + BinaryContent)."""
+
     def run_sync(self, ctx: RunContext, message: Any, **kwargs: Any) -> Any: ...
 
 
@@ -43,6 +45,7 @@ class LLMVisionOCREngine:
     Use with our wrapped agent and a structured output type (e.g. PageOCROutput) for
     schema-validated OCR; see README §10 and pydantic-ai OCR examples for the pattern.
     """
+
     name = "llm_vision"
 
     def __init__(
@@ -58,8 +61,8 @@ class LLMVisionOCREngine:
         self.prompt = prompt
         self.media_type = media_type
 
-    def ocr_pages(self, ctx: RunContext, pages: List[PageImage]) -> List[OCRPage]:
-        out: List[OCRPage] = []
+    def ocr_pages(self, ctx: RunContext, pages: list[PageImage]) -> list[OCRPage]:
+        out: list[OCRPage] = []
         for page in pages:
             image_bytes = ctx.artifacts.get_bytes(page.image_artifact_id)
             message = [

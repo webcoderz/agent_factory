@@ -8,6 +8,7 @@ Timing modes:
 - CONCURRENT: guardrail and LLM run in parallel, fail-fast on violation
 - ASYNC_POST: guardrail runs after LLM (monitoring only)
 """
+
 from __future__ import annotations
 
 import asyncio
@@ -64,9 +65,7 @@ class AsyncGuardrailMiddleware(AgentMiddleware):
         elif self.timing == GuardrailTiming.CONCURRENT:
             # Launch guardrail in background; it will raise if it fails
             self._guardrail_error = None
-            self._guardrail_task = asyncio.create_task(
-                self._run_guardrail_background(ctx, prompt)
-            )
+            self._guardrail_task = asyncio.create_task(self._run_guardrail_background(ctx, prompt))
             return prompt
         else:
             # ASYNC_POST: do nothing before run
@@ -81,10 +80,10 @@ class AsyncGuardrailMiddleware(AgentMiddleware):
                         await asyncio.wait_for(self._guardrail_task, timeout=self._timeout)
                     else:
                         await self._guardrail_task
-                except asyncio.TimeoutError:
-                    raise GuardrailTimeout(self._name, self._timeout or 0.0)
-                except InputBlocked:
-                    raise  # Re-raise — guardrail blocked the input
+                except TimeoutError as exc:
+                    raise GuardrailTimeout(self._name, self._timeout or 0.0) from exc
+                except InputBlocked as e:
+                    raise e from None  # Re-raise — guardrail blocked the input
                 finally:
                     self._guardrail_task = None
 
@@ -101,9 +100,7 @@ class AsyncGuardrailMiddleware(AgentMiddleware):
 
         return output
 
-    async def _run_guardrail_check(
-        self, ctx: RunContext, prompt: str | Sequence[Any]
-    ) -> str | Sequence[Any]:
+    async def _run_guardrail_check(self, ctx: RunContext, prompt: str | Sequence[Any]) -> str | Sequence[Any]:
         """Run guardrail synchronously (blocking)."""
         if self._timeout:
             try:
@@ -111,20 +108,18 @@ class AsyncGuardrailMiddleware(AgentMiddleware):
                     self.guardrail.before_run(ctx, prompt),
                     timeout=self._timeout,
                 )
-            except asyncio.TimeoutError:
-                raise GuardrailTimeout(self._name, self._timeout)
+            except TimeoutError as exc:
+                raise GuardrailTimeout(self._name, self._timeout) from exc
         return await self.guardrail.before_run(ctx, prompt)
 
-    async def _run_guardrail_background(
-        self, ctx: RunContext, prompt: str | Sequence[Any]
-    ) -> None:
+    async def _run_guardrail_background(self, ctx: RunContext, prompt: str | Sequence[Any]) -> None:
         """Run guardrail in background for concurrent mode."""
         try:
             await self.guardrail.before_run(ctx, prompt)
         except InputBlocked as e:
             self._guardrail_error = e
             if self.cancel_on_failure:
-                raise  # Propagate to cancel concurrent operations
+                raise e from None  # Propagate to cancel concurrent operations
         except Exception as e:
             self._guardrail_error = e
             logger.error(f"Guardrail error: {e}")

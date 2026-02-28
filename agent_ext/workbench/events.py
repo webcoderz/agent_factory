@@ -2,14 +2,16 @@ from __future__ import annotations
 
 import asyncio
 from dataclasses import dataclass
-from typing import Any, Dict, Optional
+from typing import Any
+
 
 @dataclass(frozen=True)
 class Event:
     kind: str
     who: str
     msg: str
-    data: Dict[str, Any]
+    data: dict[str, Any]
+
 
 class EventBus:
     def __init__(self):

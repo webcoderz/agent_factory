@@ -1,9 +1,9 @@
 from __future__ import annotations
 
 from dataclasses import dataclass, field
-from typing import Any, Dict, Optional
+from typing import Any
 
-Json = Dict[str, Any]
+Json = dict[str, Any]
 
 
 @dataclass(frozen=True)
@@ -26,4 +26,4 @@ class ToolResult:
     call_id: str
     ok: bool
     result: Any = None
-    error: Optional[str] = None
+    error: str | None = None

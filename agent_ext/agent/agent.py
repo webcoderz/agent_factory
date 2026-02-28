@@ -21,16 +21,16 @@ Example::
         deps=ConsoleDeps(backend=LocalFilesystemBackend(root=".", allow_write=True)),
     )
 """
+
 from __future__ import annotations
 
-from typing import Any, Optional, TypeVar
+from typing import Any, TypeVar
 
 from pydantic import BaseModel
 from pydantic_ai import Agent
 
-from ..run_context import RunContext
 from ..memory.base import MemoryManager
-from .memory_adapter import build_history_processor, checkpoint_after_run
+from .memory_adapter import build_history_processor
 
 OutputT = TypeVar("OutputT", str, BaseModel)
 
@@ -38,6 +38,7 @@ OutputT = TypeVar("OutputT", str, BaseModel)
 # ---------------------------------------------------------------------------
 # Toolset factory registry
 # ---------------------------------------------------------------------------
+
 
 def _get_toolset_factory(name: str) -> Any:
     """Lazy-load a toolset factory by name."""
@@ -49,11 +50,10 @@ def _get_toolset_factory(name: str) -> Any:
         "todo": ("agent_ext.todo.pai_toolset", "create_todo_toolset"),
     }
     if name not in factories:
-        raise ValueError(
-            f"Unknown toolset: {name!r}. Available: {sorted(factories.keys())}"
-        )
+        raise ValueError(f"Unknown toolset: {name!r}. Available: {sorted(factories.keys())}")
     mod_path, attr = factories[name]
     import importlib
+
     mod = importlib.import_module(mod_path)
     return getattr(mod, attr)
 
@@ -104,7 +104,7 @@ class AgentPatterns(Agent):
     ) -> None:
         # Resolve toolsets: strings become factory calls, objects pass through
         resolved_toolsets: list[Any] = []
-        for ts in (toolsets or []):
+        for ts in toolsets or []:
             if isinstance(ts, str):
                 factory = _get_toolset_factory(ts)
                 resolved_toolsets.append(factory())
@@ -155,6 +155,7 @@ class AgentPatterns(Agent):
     ) -> AgentPatterns:
         """Create an agent with RLM code execution tools."""
         from ..rlm.toolset import create_rlm_toolset
+
         rlm_ts = create_rlm_toolset(sub_model=sub_model)
         return cls(model, instructions=instructions, toolsets=[rlm_ts], memory=memory, **kwargs)
 

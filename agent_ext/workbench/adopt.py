@@ -3,7 +3,6 @@ from __future__ import annotations
 import os
 import subprocess
 from pathlib import Path
-from typing import Optional, Tuple
 
 # Pull strategy: "merge" (default) or "rebase". Merge is safer for automation.
 ADOPT_PULL_STRATEGY = os.getenv("ADOPT_PULL_STRATEGY", "merge").strip().lower()
@@ -11,7 +10,7 @@ ADOPT_PULL_STRATEGY = os.getenv("ADOPT_PULL_STRATEGY", "merge").strip().lower()
 ADOPT_PUSH_RETRIES = int(os.getenv("ADOPT_PUSH_RETRIES", "2"))
 
 
-def _run(cmd: list[str], *, cwd: Optional[Path] = None) -> Tuple[bool, str]:
+def _run(cmd: list[str], *, cwd: Path | None = None) -> tuple[bool, str]:
     env = os.environ.copy()  # inherits HTTP_PROXY/HTTPS_PROXY/etc.
     p = subprocess.run(cmd, cwd=str(cwd) if cwd else None, env=env, capture_output=True, text=True)
     out = (p.stdout or "") + ("\n" if p.stdout and p.stderr else "") + (p.stderr or "")
@@ -53,14 +52,22 @@ def apply_diff_to_repo(diff_text: str, *, repo_root: Path = Path(".")) -> None:
     env = os.environ.copy()
     p = subprocess.run(
         ["git", "apply", "--whitespace=nowarn", "-"],
-        cwd=str(repo_root), env=env, input=diff_text, capture_output=True, text=True,
+        cwd=str(repo_root),
+        env=env,
+        input=diff_text,
+        capture_output=True,
+        text=True,
     )
     out = (p.stdout or "") + ("\n" if p.stdout and p.stderr else "") + (p.stderr or "")
     if p.returncode == 0:
         return
     p2 = subprocess.run(
         ["git", "apply", "--3way", "--whitespace=nowarn", "-"],
-        cwd=str(repo_root), env=env, input=diff_text, capture_output=True, text=True,
+        cwd=str(repo_root),
+        env=env,
+        input=diff_text,
+        capture_output=True,
+        text=True,
     )
     out2 = (p2.stdout or "") + ("\n" if p2.stdout and p2.stderr else "") + (p2.stderr or "")
     if p2.returncode != 0:

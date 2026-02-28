@@ -1,12 +1,12 @@
 from __future__ import annotations
 
-from typing import Sequence
+from collections.abc import Sequence
 
-from agent_ext.evidence.models import Evidence, Provenance, Citation
-from agent_ext.run_context import RunContext
-from agent_ext.research.models import ResearchTask
+from agent_ext.evidence.models import Evidence, Provenance
 from agent_ext.research.ledger import ResearchLedger
+from agent_ext.research.models import ResearchTask
 from agent_ext.research.synth import build_outcome
+from agent_ext.run_context import RunContext
 
 
 async def handle_analyze(ctx: RunContext, task: ResearchTask, ledger: ResearchLedger) -> Sequence[Evidence]:
@@ -29,7 +29,11 @@ async def handle_search(ctx: RunContext, task: ResearchTask, ledger: ResearchLed
     return [
         Evidence(
             kind="note",
-            content={"goal": task.goal, "query": task.query, "note": "Search handler placeholder (wire to retrieval/web tool)."},
+            content={
+                "goal": task.goal,
+                "query": task.query,
+                "note": "Search handler placeholder (wire to retrieval/web tool).",
+            },
             citations=[],
             provenance=Provenance(produced_by="handle_search", artifact_ids=[]),
             confidence=0.3,
@@ -43,7 +47,9 @@ async def handle_subagent(ctx: RunContext, task: ResearchTask, ledger: ResearchL
     orch = ctx.subagents["orchestrator"]
     name = task.inputs.get("subagent_name")
     payload = task.inputs.get("payload", {})
-    results = await orch.run_many(ctx, [(name, payload, {"task_id": task.id})], timeout_s=task.inputs.get("timeout_s", 60))
+    results = await orch.run_many(
+        ctx, [(name, payload, {"task_id": task.id})], timeout_s=task.inputs.get("timeout_s", 60)
+    )
     res = results.get(name)
     return [
         Evidence(
@@ -63,7 +69,11 @@ async def handle_synthesize(ctx: RunContext, task: ResearchTask, ledger: Researc
     return [
         Evidence(
             kind="finding",
-            content={"final_answer": out.answer, "limitations": out.limitations, "claims": [c.model_dump() for c in out.claims]},
+            content={
+                "final_answer": out.answer,
+                "limitations": out.limitations,
+                "claims": [c.model_dump() for c in out.claims],
+            },
             citations=[],
             provenance=Provenance(produced_by="handle_synthesize", artifact_ids=[]),
             confidence=0.75,

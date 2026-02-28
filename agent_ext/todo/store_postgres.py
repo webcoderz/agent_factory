@@ -1,12 +1,10 @@
 from __future__ import annotations
 
 import uuid
-from typing import List, Optional
 
 import asyncpg
 
 from agent_ext.todo.models import Task, TaskCreate, TaskPatch, TaskQuery, now_utc
-
 
 CREATE_SQL = """
 CREATE TABLE IF NOT EXISTS agent_tasks (
@@ -67,7 +65,7 @@ class PostgresTaskStore:
         self.pool = pool
 
     @classmethod
-    async def connect(cls, dsn: str) -> "PostgresTaskStore":
+    async def connect(cls, dsn: str) -> PostgresTaskStore:
         pool = await asyncpg.create_pool(dsn)
         async with pool.acquire() as conn:
             await conn.execute(CREATE_SQL)
@@ -108,12 +106,12 @@ class PostgresTaskStore:
             row = await conn.fetchrow("SELECT * FROM agent_tasks WHERE id=$1", tid)
             return _row_to_task(row)
 
-    async def get_task(self, task_id: str) -> Optional[Task]:
+    async def get_task(self, task_id: str) -> Task | None:
         async with self.pool.acquire() as conn:
             row = await conn.fetchrow("SELECT * FROM agent_tasks WHERE id=$1", task_id)
             return _row_to_task(row) if row else None
 
-    async def list_tasks(self, q: TaskQuery) -> List[Task]:
+    async def list_tasks(self, q: TaskQuery) -> list[Task]:
         clauses = []
         args = []
         i = 1
@@ -154,7 +152,7 @@ class PostgresTaskStore:
             rows = await conn.fetch(sql, *args)
             return [_row_to_task(r) for r in rows]
 
-    async def update_task(self, task_id: str, patch: TaskPatch) -> Optional[Task]:
+    async def update_task(self, task_id: str, patch: TaskPatch) -> Task | None:
         existing = await self.get_task(task_id)
         if not existing:
             return None
@@ -205,7 +203,7 @@ class PostgresTaskStore:
             # asyncpg returns "DELETE <n>"
             return r.split()[-1] != "0"
 
-    async def add_dependency(self, task_id: str, depends_on_task_id: str) -> Optional[Task]:
+    async def add_dependency(self, task_id: str, depends_on_task_id: str) -> Task | None:
         t = await self.get_task(task_id)
         if not t:
             return None
@@ -226,7 +224,7 @@ class PostgresTaskStore:
         )
         return await self.create_task(merged)
 
-    async def next_runnable_tasks(self, q: TaskQuery) -> List[Task]:
+    async def next_runnable_tasks(self, q: TaskQuery) -> list[Task]:
         """
         Postgres-side filter for runnable tasks:
         - within tenant scope filters
@@ -363,7 +361,7 @@ class PostgresTaskStore:
 
         return _count(r1) + _count(r2)
 
-    async def get_task_tree(self, root_task_id: str, include_rollup: bool = False) -> Optional[dict]:
+    async def get_task_tree(self, root_task_id: str, include_rollup: bool = False) -> dict | None:
         async with self.pool.acquire() as conn:
             rows = await conn.fetch(
                 """
@@ -410,10 +408,13 @@ class PostgresTaskStore:
                 is_terminal = node.status in {"done", "canceled", "failed"}
                 is_runnable = (node.status in {"pending", "in_progress"}) and not blocked_by
 
-                totals = {"total": 1, "done": 1 if node.status == "done" else 0,
-                          "blocked": 1 if (node.status == "blocked" or blocked_by) else 0,
-                          "failed": 1 if node.status == "failed" else 0,
-                          "open": 0 if is_terminal else 1}
+                totals = {
+                    "total": 1,
+                    "done": 1 if node.status == "done" else 0,
+                    "blocked": 1 if (node.status == "blocked" or blocked_by) else 0,
+                    "failed": 1 if node.status == "failed" else 0,
+                    "open": 0 if is_terminal else 1,
+                }
 
                 for ch in out["children"]:
                     r = ch.get("rollup") or {}
