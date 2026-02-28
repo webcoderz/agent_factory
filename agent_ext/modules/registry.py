@@ -1,9 +1,8 @@
 from __future__ import annotations
 
 import json
-from dataclasses import asdict
+from collections.abc import Iterable
 from pathlib import Path
-from typing import Dict, Iterable, List, Optional
 
 from .loader import import_module
 from .spec import ModuleSpec, ModuleState
@@ -19,11 +18,11 @@ class ModuleRegistry:
 
     def __init__(self, *, state_file: Path = STATE_FILE_DEFAULT):
         self.state_file = state_file
-        self.modules: Dict[str, ModuleState] = {}
+        self.modules: dict[str, ModuleState] = {}
 
-    def discover_builtin_import_paths(self) -> List[str]:
+    def discover_builtin_import_paths(self) -> list[str]:
         root = Path(__file__).resolve().parent / "builtins"
-        paths: List[str] = []
+        paths: list[str] = []
         if not root.exists():
             return paths
         for mod_dir in sorted(p for p in root.iterdir() if p.is_dir()):
@@ -35,7 +34,7 @@ class ModuleRegistry:
 
     def load_from_import_path(self, import_path: str) -> ModuleSpec:
         mod = import_module(import_path)
-        spec: Optional[ModuleSpec] = getattr(mod, "module_spec", None)
+        spec: ModuleSpec | None = getattr(mod, "module_spec", None)
         if spec is None:
             raise RuntimeError(f"{import_path} must define `module_spec: ModuleSpec`")
         return spec
@@ -71,7 +70,7 @@ class ModuleRegistry:
         }
         self.state_file.write_text(json.dumps(data, indent=2), encoding="utf-8")
 
-    def load_saved(self) -> Dict[str, bool]:
+    def load_saved(self) -> dict[str, bool]:
         if not self.state_file.exists():
             return {}
         try:
@@ -81,7 +80,7 @@ class ModuleRegistry:
             data = json.loads(raw)
         except (json.JSONDecodeError, OSError):
             return {}
-        out: Dict[str, bool] = {}
+        out: dict[str, bool] = {}
         for item in data.get("modules", []):
             out[item["name"]] = bool(item.get("enabled", True))
         return out

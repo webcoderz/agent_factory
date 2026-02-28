@@ -1,11 +1,12 @@
 from __future__ import annotations
-from typing import List, Sequence
+
+from collections.abc import Sequence
 
 from .models import SkillSpec
 
 
 class SkillSelection:
-    def __init__(self, *, include_catalog: bool, load_full: List[str]):
+    def __init__(self, *, include_catalog: bool, load_full: list[str]):
         self.include_catalog = include_catalog
         self.load_full = load_full
 
@@ -16,6 +17,7 @@ class SkillSelector:
     - always include catalog summaries
     - load full bodies only for selected skill IDs
     """
+
     def select(self, intent: str, *, catalog: Sequence[SkillSpec]) -> SkillSelection:
         # Replace with your router’s intent logic. This is a safe baseline.
         if intent in {"ingest_doc", "ocr", "parse_document"}:

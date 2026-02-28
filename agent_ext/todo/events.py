@@ -1,13 +1,13 @@
 from __future__ import annotations
 
 import asyncio
+from collections.abc import Awaitable, Callable
 from dataclasses import dataclass
-from typing import Any, Awaitable, Callable, Dict, List, Optional, Protocol
+from typing import Any, Protocol
 
 import httpx
 
 from agent_ext.todo.models import Task
-
 
 TaskEventName = str  # e.g., "task_created", "task_updated", "task_completed"
 
@@ -16,7 +16,7 @@ TaskEventName = str  # e.g., "task_created", "task_updated", "task_completed"
 class TaskEvent:
     name: TaskEventName
     task: Task
-    payload: Dict[str, Any]
+    payload: dict[str, Any]
 
 
 class TaskEventBus(Protocol):
@@ -25,7 +25,7 @@ class TaskEventBus(Protocol):
 
 class InProcessEventBus:
     def __init__(self) -> None:
-        self._handlers: Dict[TaskEventName, List[Callable[[TaskEvent], Awaitable[None]]]] = {}
+        self._handlers: dict[TaskEventName, list[Callable[[TaskEvent], Awaitable[None]]]] = {}
 
     def on(self, name: TaskEventName, handler: Callable[[TaskEvent], Awaitable[None]]) -> None:
         self._handlers.setdefault(name, []).append(handler)
@@ -40,7 +40,8 @@ class WebhookEventBus:
     """
     Sends task events to one or more webhook URLs.
     """
-    def __init__(self, urls: List[str], *, timeout_s: float = 10.0, headers: Optional[Dict[str, str]] = None) -> None:
+
+    def __init__(self, urls: list[str], *, timeout_s: float = 10.0, headers: dict[str, str] | None = None) -> None:
         self.urls = urls
         self.timeout_s = timeout_s
         self.headers = headers or {}

@@ -1,6 +1,9 @@
 from __future__ import annotations
+
 from typing import Protocol
+
 from agent_ext.export.models import ExportRequest, ExportResult
+
 
 class Exporter(Protocol):
     def render_bytes(self, *, req: ExportRequest, outcome: dict) -> bytes: ...

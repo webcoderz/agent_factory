@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-from typing import Callable, Optional
+from collections.abc import Callable
 
 from rich.console import Console
 from rich.markdown import Markdown
@@ -12,7 +12,7 @@ console = Console()
 def run_tui(
     *,
     on_user_message: Callable[[str], str],
-    on_command: Callable[[str], Optional[str]],
+    on_command: Callable[[str], str | None],
 ) -> None:
     console.print(Panel.fit("agent_patterns workbench (type /help for commands, /quit to exit)"))
 

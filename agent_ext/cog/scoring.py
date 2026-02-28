@@ -1,10 +1,9 @@
 from __future__ import annotations
 
 from dataclasses import dataclass
-from typing import Dict, List
 
 
-def touched_files_from_diff(diff_text: str) -> List[str]:
+def touched_files_from_diff(diff_text: str) -> list[str]:
     files = []
     for line in diff_text.splitlines():
         if line.startswith("diff --git "):
@@ -17,7 +16,17 @@ def touched_files_from_diff(diff_text: str) -> List[str]:
 @dataclass(frozen=True)
 class Score:
     total: float
-    reasons: Dict[str, float]
+    reasons: dict[str, float]
+
+    @property
+    def score(self) -> float:
+        """Alias for ``total`` — used by workbench loop and cog loop."""
+        return self.total
+
+    @property
+    def ok(self) -> bool:
+        """True when gates passed (positive gates score)."""
+        return self.reasons.get("gates", 0.0) > 0
 
 
 def score_patch(*, gates_ok: bool, diff_chars: int, files_touched: int, eval_delta: float = 0.0) -> Score:
@@ -28,7 +37,7 @@ def score_patch(*, gates_ok: bool, diff_chars: int, files_touched: int, eval_del
       - diff_chars/2000 (cap 30)
       - 2*files_touched (cap 20)
     """
-    reasons: Dict[str, float] = {}
+    reasons: dict[str, float] = {}
     total = 0.0
 
     reasons["gates"] = 100.0 if gates_ok else -50.0

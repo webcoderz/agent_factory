@@ -5,7 +5,6 @@ import shutil
 import subprocess
 from dataclasses import dataclass
 from pathlib import Path
-from typing import Optional, Tuple
 
 WORKTREES_ROOT = Path(".agent_state/worktrees")
 
@@ -18,7 +17,7 @@ class WorktreeHandle:
     path: Path
 
 
-def _run(cmd: list[str], *, cwd: Optional[Path] = None) -> Tuple[bool, str]:
+def _run(cmd: list[str], *, cwd: Path | None = None) -> tuple[bool, str]:
     env = os.environ.copy()  # includes HTTP_PROXY/HTTPS_PROXY/etc.
     p = subprocess.run(cmd, cwd=str(cwd) if cwd else None, env=env, capture_output=True, text=True)
     ok = p.returncode == 0
@@ -71,9 +70,15 @@ def create_worktree(
 
 def worktree_diff(wt: WorktreeHandle) -> str:
     """
-    Unified diff of changes in the worktree.
+    Unified diff of ALL changes in the worktree (edits + new files).
+    Stages everything first so new (untracked) files are captured.
     """
-    ok, out = _run(["git", "diff"], cwd=wt.path)
+    # Stage all changes (including new/untracked files)
+    ok, out = _run(["git", "add", "-A"], cwd=wt.path)
+    if not ok:
+        raise RuntimeError(f"git add -A failed: {out}")
+    # Diff staged changes against HEAD to capture everything
+    ok, out = _run(["git", "diff", "--cached", "HEAD"], cwd=wt.path)
     if not ok:
         raise RuntimeError(out)
     return out

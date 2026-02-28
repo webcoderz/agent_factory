@@ -4,7 +4,6 @@ import json
 import time
 from dataclasses import dataclass
 from pathlib import Path
-from typing import Optional
 
 LOCKS_DIR = Path(".agent_state/locks")
 
@@ -25,7 +24,7 @@ class LeaseLockStore:
         safe = "".join(ch if ch.isalnum() or ch in "-_." else "_" for ch in key)
         return self.root / f"{safe}.json"
 
-    def try_acquire(self, *, key: str, owner: str, ttl_s: int = 900) -> Optional[Lease]:
+    def try_acquire(self, *, key: str, owner: str, ttl_s: int = 900) -> Lease | None:
         """
         Best-effort lock. If expired, we steal it.
         """
@@ -41,7 +40,9 @@ class LeaseLockStore:
                 pass  # treat as expired/corrupt
 
         lease = Lease(key=key, owner=owner, expires_at=now + ttl_s)
-        p.write_text(json.dumps({"key": key, "owner": owner, "expires_at": lease.expires_at}, indent=2), encoding="utf-8")
+        p.write_text(
+            json.dumps({"key": key, "owner": owner, "expires_at": lease.expires_at}, indent=2), encoding="utf-8"
+        )
         return lease
 
     def release(self, lease: Lease) -> None:

@@ -2,12 +2,13 @@ from __future__ import annotations
 
 import hashlib
 import time
+from collections.abc import Sequence
 from dataclasses import dataclass, field
-from typing import Any, Dict, List, Optional, Sequence
+from typing import Any
 
 from agent_ext.evidence.models import Evidence
-from agent_ext.run_context import RunContext
 from agent_ext.research.models import ResearchPlan, ResearchTask
+from agent_ext.run_context import RunContext
 
 
 def _hash_jsonable(obj: Any) -> str:
@@ -26,18 +27,19 @@ class ResearchLedger:
     - evidence batches
     - final report
     """
+
     plan: ResearchPlan
-    tasks: Dict[str, ResearchTask] = field(default_factory=dict)
-    evidence: List[Evidence] = field(default_factory=list)
-    events: List[Dict[str, Any]] = field(default_factory=list)
+    tasks: dict[str, ResearchTask] = field(default_factory=dict)
+    evidence: list[Evidence] = field(default_factory=list)
+    events: list[dict[str, Any]] = field(default_factory=list)
 
     def __post_init__(self) -> None:
         self.tasks = {t.id: t for t in self.plan.tasks}
 
-    def add_event(self, kind: str, payload: Dict[str, Any]) -> None:
+    def add_event(self, kind: str, payload: dict[str, Any]) -> None:
         self.events.append({"t": time.time(), "kind": kind, "payload": payload})
 
-    def add_evidence(self, ev: Sequence[Evidence]) -> List[str]:
+    def add_evidence(self, ev: Sequence[Evidence]) -> list[str]:
         before = len(self.evidence)
         self.evidence.extend(list(ev))
         after = len(self.evidence)
@@ -47,25 +49,27 @@ class ResearchLedger:
 
     def evidence_id(self, e: Evidence) -> str:
         # stable id for this run, based on content/provenance/citations
-        return _hash_jsonable({
-            "kind": e.kind,
-            "content": e.content,
-            "prov": e.provenance.model_dump(),
-            "cits": [c.model_dump() for c in e.citations],
-            "tags": e.tags,
-        })
+        return _hash_jsonable(
+            {
+                "kind": e.kind,
+                "content": e.content,
+                "prov": e.provenance.model_dump(),
+                "cits": [c.model_dump() for c in e.citations],
+                "tags": e.tags,
+            }
+        )
 
     def get_task(self, task_id: str) -> ResearchTask:
         return self.tasks[task_id]
 
-    def list_tasks(self) -> List[ResearchTask]:
+    def list_tasks(self) -> list[ResearchTask]:
         return list(self.tasks.values())
 
-    def pending_tasks(self) -> List[ResearchTask]:
+    def pending_tasks(self) -> list[ResearchTask]:
         return [t for t in self.tasks.values() if t.status == "pending"]
 
-    def runnable_tasks(self) -> List[ResearchTask]:
-        runnable: List[ResearchTask] = []
+    def runnable_tasks(self) -> list[ResearchTask]:
+        runnable: list[ResearchTask] = []
         for t in self.tasks.values():
             if t.status != "pending":
                 continue

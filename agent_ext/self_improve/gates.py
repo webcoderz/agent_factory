@@ -3,18 +3,13 @@ from __future__ import annotations
 import subprocess
 import sys
 from pathlib import Path
-from typing import List
 
 from .models import GatePlan, GateResults
 
 
 def run_import_check(*, cwd: Path | None = None) -> tuple[bool, str]:
     # Try importing the main packages as a sanity check.
-    code = (
-        "import agent_ext\n"
-        "import agent_patterns\n"
-        "print('imports_ok')\n"
-    )
+    code = "import agent_ext\nimport agent_patterns\nprint('imports_ok')\n"
     kw = {"capture_output": True, "text": True}
     if cwd is not None:
         kw["cwd"] = str(cwd)
@@ -33,7 +28,7 @@ def run_compile_check(*, cwd: Path | None = None) -> tuple[bool, str]:
     return ok, (p.stdout + "\n" + p.stderr).strip()
 
 
-def run_pytest(paths: List[str], *, cwd: Path | None = None) -> tuple[bool, str]:
+def run_pytest(paths: list[str], *, cwd: Path | None = None) -> tuple[bool, str]:
     if not paths:
         return True, "pytest skipped (no paths)"
     kw = {"capture_output": True, "text": True}

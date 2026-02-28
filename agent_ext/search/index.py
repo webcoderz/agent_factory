@@ -1,11 +1,8 @@
 from __future__ import annotations
 
 import hashlib
-import os
-import time
 from dataclasses import dataclass
 from pathlib import Path
-from typing import Dict, Iterable, List, Optional, Sequence, Tuple
 
 from .store import REPO_INDEX_FILE, RepoIndexState, read_json, write_json
 
@@ -36,8 +33,8 @@ def _file_lang(path: Path) -> str:
 @dataclass
 class RepoIndexerConfig:
     root: str = "."
-    exts: Tuple[str, ...] = DEFAULT_EXTS
-    exclude_dirs: Tuple[str, ...] = (".git", ".agent_state", "__pycache__", "dist", "build", ".venv")
+    exts: tuple[str, ...] = DEFAULT_EXTS
+    exclude_dirs: tuple[str, ...] = (".git", ".agent_state", "__pycache__", "dist", "build", ".venv")
     max_file_bytes: int = 2_000_000  # 2MB cap per file for indexing
     max_files: int = 50_000
 
@@ -59,8 +56,8 @@ class RepoIndexer:
         parts = set(p.parts)
         return any(ed in parts for ed in self.cfg.exclude_dirs)
 
-    def scan(self) -> List[Path]:
-        out: List[Path] = []
+    def scan(self) -> list[Path]:
+        out: list[Path] = []
         for p in self.root.rglob("*"):
             if len(out) >= self.cfg.max_files:
                 break
@@ -73,14 +70,14 @@ class RepoIndexer:
             out.append(p)
         return out
 
-    def update_incremental(self) -> Tuple[RepoIndexState, List[str], List[str]]:
+    def update_incremental(self) -> tuple[RepoIndexState, list[str], list[str]]:
         """
         Returns (state, changed_paths, removed_paths)
         """
         st = self.load_state()
         existing = set(st.files.keys())
         seen = set()
-        changed: List[str] = []
+        changed: list[str] = []
 
         for p in self.scan():
             rel = str(p.relative_to(self.root))
@@ -93,7 +90,11 @@ class RepoIndexer:
 
             # quick skip by mtime/size
             prev = st.files.get(rel)
-            if prev and int(prev.get("size", -1)) == int(stat.st_size) and float(prev.get("mtime", -1)) == float(stat.st_mtime):
+            if (
+                prev
+                and int(prev.get("size", -1)) == int(stat.st_size)
+                and float(prev.get("mtime", -1)) == float(stat.st_mtime)
+            ):
                 continue
 
             if stat.st_size > self.cfg.max_file_bytes:
@@ -129,7 +130,7 @@ class RepoIndexer:
         self.save_state(st)
         return st, changed, removed
 
-    def read_text(self, rel_path: str) -> Optional[str]:
+    def read_text(self, rel_path: str) -> str | None:
         p = self.root / rel_path
         try:
             return p.read_text(encoding="utf-8", errors="ignore")

@@ -1,14 +1,13 @@
 from __future__ import annotations
 
 import uuid
-from typing import Dict, List, Optional
 
 from agent_ext.todo.models import Task, TaskCreate, TaskPatch, TaskQuery, now_utc
 
 
 class InMemoryTaskStore:
     def __init__(self) -> None:
-        self._tasks: Dict[str, Task] = {}
+        self._tasks: dict[str, Task] = {}
 
     async def create_task(self, data: TaskCreate) -> Task:
         tid = uuid.uuid4().hex
@@ -28,10 +27,10 @@ class InMemoryTaskStore:
         self._tasks[tid] = t
         return t
 
-    async def get_task(self, task_id: str) -> Optional[Task]:
+    async def get_task(self, task_id: str) -> Task | None:
         return self._tasks.get(task_id)
 
-    async def list_tasks(self, q: TaskQuery) -> List[Task]:
+    async def list_tasks(self, q: TaskQuery) -> list[Task]:
         items = list(self._tasks.values())
 
         def match(t: Task) -> bool:
@@ -57,7 +56,7 @@ class InMemoryTaskStore:
         filtered.sort(key=lambda x: (x.priority, x.created_at))
         return filtered[q.offset : q.offset + q.limit]
 
-    async def update_task(self, task_id: str, patch: TaskPatch) -> Optional[Task]:
+    async def update_task(self, task_id: str, patch: TaskPatch) -> Task | None:
         t = self._tasks.get(task_id)
         if not t:
             return None
@@ -80,7 +79,7 @@ class InMemoryTaskStore:
     async def delete_task(self, task_id: str) -> bool:
         return self._tasks.pop(task_id, None) is not None
 
-    async def add_dependency(self, task_id: str, depends_on_task_id: str) -> Optional[Task]:
+    async def add_dependency(self, task_id: str, depends_on_task_id: str) -> Task | None:
         t = self._tasks.get(task_id)
         if not t:
             return None
@@ -101,7 +100,8 @@ class InMemoryTaskStore:
             user_id=data.user_id or parent.user_id,
         )
         return await self.create_task(merged)
-    async def next_runnable_tasks(self, q: TaskQuery) -> List[Task]:
+
+    async def next_runnable_tasks(self, q: TaskQuery) -> list[Task]:
         """
         Runnable = status in {pending, in_progress} AND all dependencies are done.
         (in_progress included so you can resume partially-run tasks)
@@ -158,7 +158,7 @@ class InMemoryTaskStore:
 
         return updated
 
-    async def get_task_tree(self, root_task_id: str, include_rollup: bool = False) -> Optional[dict]:
+    async def get_task_tree(self, root_task_id: str, include_rollup: bool = False) -> dict | None:
         root = await self.get_task(root_task_id)
         if not root:
             return None
@@ -192,10 +192,13 @@ class InMemoryTaskStore:
                 is_runnable = (node.status in {"pending", "in_progress"}) and not blocked_by
 
                 # subtree stats
-                totals = {"total": 1, "done": 1 if node.status == "done" else 0,
-                          "blocked": 1 if (node.status == "blocked" or blocked_by) else 0,
-                          "failed": 1 if node.status == "failed" else 0,
-                          "open": 0 if is_terminal else 1}
+                totals = {
+                    "total": 1,
+                    "done": 1 if node.status == "done" else 0,
+                    "blocked": 1 if (node.status == "blocked" or blocked_by) else 0,
+                    "failed": 1 if node.status == "failed" else 0,
+                    "open": 0 if is_terminal else 1,
+                }
 
                 for ch in out["children"]:
                     r = ch.get("rollup") or {}

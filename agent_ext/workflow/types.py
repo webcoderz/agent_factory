@@ -1,9 +1,9 @@
 from __future__ import annotations
 
 from dataclasses import dataclass, field
-from typing import Any, Callable, Dict, List, Optional, Protocol, Sequence, Tuple
+from typing import Any, Protocol
 
-Json = Dict[str, Any]
+Json = dict[str, Any]
 
 
 @dataclass(frozen=True)
@@ -12,10 +12,11 @@ class Capability:
     Declares what a component can do.
     Example tags: "plan", "ocr", "memory", "search_repo", "patch", "gates", "summarize"
     """
+
     name: str
-    tags: Tuple[str, ...]
-    cost_hint: int = 1              # rough relative cost
-    quality_hint: float = 0.5       # rough prior
+    tags: tuple[str, ...]
+    cost_hint: int = 1  # rough relative cost
+    quality_hint: float = 0.5  # rough prior
     requires_model: bool = False
 
 
@@ -23,6 +24,7 @@ class Component(Protocol):
     """
     A runnable building block: takes ctx + state; returns updated state.
     """
+
     capability: Capability
 
     async def run(self, ctx, state: Json) -> Json: ...
@@ -31,8 +33,8 @@ class Component(Protocol):
 @dataclass(frozen=True)
 class StepSpec:
     component_name: str
-    input_keys: Tuple[str, ...] = ()
-    output_key: Optional[str] = None
+    input_keys: tuple[str, ...] = ()
+    output_key: str | None = None
     meta: Json = field(default_factory=dict)
 
 
@@ -41,16 +43,17 @@ class WorkflowSpec:
     """
     A workflow is a DAG in disguise (for now sequence; can grow to DAG later).
     """
+
     name: str
-    steps: Tuple[StepSpec, ...]
+    steps: tuple[StepSpec, ...]
     meta: Json = field(default_factory=dict)
 
 
 @dataclass(frozen=True)
 class TaskRequest:
     text: str
-    task_type: str = "general"              # e.g. "ocr", "code_change", "research"
-    hints: Tuple[str, ...] = ()             # e.g. ("needs_ocr", "needs_memory")
+    task_type: str = "general"  # e.g. "ocr", "code_change", "research"
+    hints: tuple[str, ...] = ()  # e.g. ("needs_ocr", "needs_memory")
     constraints: Json = field(default_factory=dict)
 
 
@@ -60,4 +63,4 @@ class ExecutionResult:
     workflow_name: str
     outputs: Json
     metrics: Json
-    trace: List[Json]                       # per-step trace for learning/debug
+    trace: list[Json]  # per-step trace for learning/debug

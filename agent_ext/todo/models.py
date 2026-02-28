@@ -1,15 +1,15 @@
 from __future__ import annotations
 
-from datetime import datetime, timezone
-from typing import Any, Dict, List, Literal, Optional
-from pydantic import BaseModel, Field
+from datetime import UTC, datetime
+from typing import Any, Literal
 
+from pydantic import BaseModel, Field
 
 TaskStatus = Literal["pending", "in_progress", "blocked", "done", "canceled", "failed"]
 
 
 def now_utc() -> datetime:
-    return datetime.now(timezone.utc)
+    return datetime.now(UTC)
 
 
 class Task(BaseModel):
@@ -19,28 +19,29 @@ class Task(BaseModel):
     - supports dependencies (depends_on)
     - supports multi-tenant scoping (case_id/session_id/user_id)
     """
+
     id: str
     title: str
-    description: Optional[str] = None
+    description: str | None = None
 
     status: TaskStatus = "pending"
     priority: int = 50
 
-    parent_id: Optional[str] = None
-    depends_on: List[str] = Field(default_factory=list)
-    tags: List[str] = Field(default_factory=list)
+    parent_id: str | None = None
+    depends_on: list[str] = Field(default_factory=list)
+    tags: list[str] = Field(default_factory=list)
 
     # Multi-tenant / scoping
-    case_id: Optional[str] = None
-    session_id: Optional[str] = None
-    user_id: Optional[str] = None
+    case_id: str | None = None
+    session_id: str | None = None
+    user_id: str | None = None
 
     # Links to your audit/evidence world
-    artifact_ids: List[str] = Field(default_factory=list)
-    evidence_ids: List[str] = Field(default_factory=list)
+    artifact_ids: list[str] = Field(default_factory=list)
+    evidence_ids: list[str] = Field(default_factory=list)
 
     # Generic metadata for planner/router/judge notes
-    meta: Dict[str, Any] = Field(default_factory=dict)
+    meta: dict[str, Any] = Field(default_factory=dict)
 
     created_at: datetime = Field(default_factory=now_utc)
     updated_at: datetime = Field(default_factory=now_utc)
@@ -48,45 +49,46 @@ class Task(BaseModel):
 
 class TaskCreate(BaseModel):
     title: str
-    description: Optional[str] = None
+    description: str | None = None
     priority: int = 50
-    parent_id: Optional[str] = None
-    depends_on: List[str] = Field(default_factory=list)
-    tags: List[str] = Field(default_factory=list)
-    meta: Dict[str, Any] = Field(default_factory=dict)
+    parent_id: str | None = None
+    depends_on: list[str] = Field(default_factory=list)
+    tags: list[str] = Field(default_factory=list)
+    meta: dict[str, Any] = Field(default_factory=dict)
 
-    case_id: Optional[str] = None
-    session_id: Optional[str] = None
-    user_id: Optional[str] = None
+    case_id: str | None = None
+    session_id: str | None = None
+    user_id: str | None = None
 
 
 class TaskPatch(BaseModel):
-    title: Optional[str] = None
-    description: Optional[str] = None
-    status: Optional[TaskStatus] = None
-    priority: Optional[int] = None
-    parent_id: Optional[str] = None
+    title: str | None = None
+    description: str | None = None
+    status: TaskStatus | None = None
+    priority: int | None = None
+    parent_id: str | None = None
 
-    depends_on: Optional[List[str]] = None
-    tags: Optional[List[str]] = None
+    depends_on: list[str] | None = None
+    tags: list[str] | None = None
 
-    artifact_ids: Optional[List[str]] = None
-    evidence_ids: Optional[List[str]] = None
-    meta: Optional[Dict[str, Any]] = None
+    artifact_ids: list[str] | None = None
+    evidence_ids: list[str] | None = None
+    meta: dict[str, Any] | None = None
 
 
 class TaskQuery(BaseModel):
     """
     Filter used by list/search.
     """
-    case_id: Optional[str] = None
-    session_id: Optional[str] = None
-    user_id: Optional[str] = None
 
-    status: Optional[TaskStatus] = None
-    parent_id: Optional[str] = None
-    tag: Optional[str] = None
+    case_id: str | None = None
+    session_id: str | None = None
+    user_id: str | None = None
 
-    text: Optional[str] = None  # simple substring match for title/description
+    status: TaskStatus | None = None
+    parent_id: str | None = None
+    tag: str | None = None
+
+    text: str | None = None  # simple substring match for title/description
     limit: int = 200
     offset: int = 0

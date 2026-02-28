@@ -2,11 +2,10 @@ from __future__ import annotations
 
 import math
 from dataclasses import dataclass
-from typing import Any, Dict, List, Tuple
 
+from .index import RepoIndexer, RepoIndexerConfig
 from .store import BM25_INDEX_FILE, BM25_META_FILE, read_json, write_json
 from .tokenize import Tokenizer, TokenizerConfig
-from .index import RepoIndexer, RepoIndexerConfig
 
 
 @dataclass
@@ -21,15 +20,16 @@ class BM25Index:
     In-memory BM25 with incremental rebuild for changed files.
     Persisted to .agent_state/bm25_index.json and bm25_meta.json
     """
+
     def __init__(self, *, bm25_cfg: BM25Config, tok_cfg: TokenizerConfig, indexer_cfg: RepoIndexerConfig):
         self.bm25_cfg = bm25_cfg
         self.tokenizer = Tokenizer(tok_cfg)
         self.indexer = RepoIndexer(indexer_cfg)
 
         # postings: token -> {doc_id: tf}
-        self.postings: Dict[str, Dict[str, int]] = {}
-        self.doc_len: Dict[str, int] = {}
-        self.doc_sha: Dict[str, str] = {}
+        self.postings: dict[str, dict[str, int]] = {}
+        self.doc_len: dict[str, int] = {}
+        self.doc_sha: dict[str, str] = {}
         self.N: int = 0
         self.avgdl: float = 0.0
         self._index_ready: bool = False  # rebuild deferred until first search
@@ -42,7 +42,7 @@ class BM25Index:
         self._index_ready = True
 
     def load(self) -> None:
-        meta = read_json(BM25_META_FILE, {})
+        read_json(BM25_META_FILE, {})
         data = read_json(BM25_INDEX_FILE, {})
         self.postings = data.get("postings", {})
         self.doc_len = data.get("doc_len", {})
@@ -51,21 +51,27 @@ class BM25Index:
         self.avgdl = float(data.get("avgdl", 0.0))
 
     def save(self) -> None:
-        write_json(BM25_META_FILE, {
-            "k1": self.bm25_cfg.k1,
-            "b": self.bm25_cfg.b,
-            "tokenizer": {
-                "use_tiktoken": bool(self.tokenizer.cfg.use_tiktoken),
-                "tiktoken_encoding": self.tokenizer.cfg.tiktoken_encoding,
+        write_json(
+            BM25_META_FILE,
+            {
+                "k1": self.bm25_cfg.k1,
+                "b": self.bm25_cfg.b,
+                "tokenizer": {
+                    "use_tiktoken": bool(self.tokenizer.cfg.use_tiktoken),
+                    "tiktoken_encoding": self.tokenizer.cfg.tiktoken_encoding,
+                },
             },
-        })
-        write_json(BM25_INDEX_FILE, {
-            "postings": self.postings,
-            "doc_len": self.doc_len,
-            "doc_sha": self.doc_sha,
-            "N": self.N,
-            "avgdl": self.avgdl,
-        })
+        )
+        write_json(
+            BM25_INDEX_FILE,
+            {
+                "postings": self.postings,
+                "doc_len": self.doc_len,
+                "doc_sha": self.doc_sha,
+                "N": self.N,
+                "avgdl": self.avgdl,
+            },
+        )
 
     def _remove_doc(self, doc_id: str) -> None:
         # remove doc from postings
@@ -79,7 +85,7 @@ class BM25Index:
 
     def _add_doc(self, doc_id: str, text: str, sha: str) -> None:
         toks = self.tokenizer.tokenize(text)
-        tf: Dict[str, int] = {}
+        tf: dict[str, int] = {}
         for t in toks:
             tf[t] = tf.get(t, 0) + 1
 
@@ -89,7 +95,7 @@ class BM25Index:
         self.doc_len[doc_id] = len(toks)
         self.doc_sha[doc_id] = sha
 
-    def rebuild_incremental(self) -> Tuple[int, int]:
+    def rebuild_incremental(self) -> tuple[int, int]:
         """
         Updates repo index, then updates BM25 index only for changed/removed files.
         Returns (num_changed, num_removed).
@@ -133,7 +139,7 @@ class BM25Index:
         self.save()
         return len(changed), len(removed)
 
-    def search(self, query: str, *, top_k: int | None = None) -> List[Tuple[str, float]]:
+    def search(self, query: str, *, top_k: int | None = None) -> list[tuple[str, float]]:
         self.ensure_index()
         q_toks = self.tokenizer.tokenize(query)
         if not q_toks or self.N == 0:
@@ -143,7 +149,7 @@ class BM25Index:
         b = self.bm25_cfg.b
         top_k = top_k or self.bm25_cfg.top_k
 
-        scores: Dict[str, float] = {}
+        scores: dict[str, float] = {}
         seen_tokens = set(q_toks)
 
         for tok in seen_tokens:

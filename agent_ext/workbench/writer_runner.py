@@ -1,7 +1,7 @@
 from __future__ import annotations
 
 from dataclasses import dataclass
-from typing import Any, Dict, Optional
+from typing import Any
 
 from .locks import LeaseLockStore
 from .worktrees import WorktreeHandle, cleanup_worktree, create_worktree, worktree_diff
@@ -11,7 +11,7 @@ from .worktrees import WorktreeHandle, cleanup_worktree, create_worktree, worktr
 class WriterResult:
     ok: bool
     diff: str
-    meta: Dict[str, Any]
+    meta: dict[str, Any]
 
 
 class WriterCoordinator:
@@ -25,9 +25,9 @@ class WriterCoordinator:
         run_id: str,
         agent_name: str,
         write_key: str,
-        subagent,                      # must have async run(ctx, input, meta)
+        subagent,  # must have async run(ctx, input, meta)
         input: Any,
-        meta: Dict[str, Any],
+        meta: dict[str, Any],
         ttl_s: int = 900,
         prune_branch: bool = False,
     ) -> WriterResult:
@@ -36,7 +36,7 @@ class WriterCoordinator:
         if not lease:
             return WriterResult(ok=False, diff="", meta={"error": f"lock busy: {write_key}"})
 
-        wt: Optional[WorktreeHandle] = None
+        wt: WorktreeHandle | None = None
         try:
             wt = create_worktree(run_id=run_id, agent_name=agent_name)
             # Tell the subagent to operate inside the worktree path

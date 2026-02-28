@@ -3,7 +3,6 @@ from __future__ import annotations
 import json
 from dataclasses import dataclass
 from pathlib import Path
-from typing import Dict, List, Tuple
 
 from .types import ExecutionResult, TaskRequest
 
@@ -39,14 +38,16 @@ class ExperienceStore:
         data = self._read_data()
         b = _bucket(req)
         data["buckets"].setdefault(b, [])
-        data["buckets"][b].append({
-            "workflow": result.workflow_name,
-            "ok": result.ok,
-            "reward": reward,
-            "dt_ms": result.metrics.get("dt_ms"),
-        })
+        data["buckets"][b].append(
+            {
+                "workflow": result.workflow_name,
+                "ok": result.ok,
+                "reward": reward,
+                "dt_ms": result.metrics.get("dt_ms"),
+            }
+        )
         self.path.write_text(json.dumps(data, indent=2), encoding="utf-8")
 
-    def get_bucket_stats(self, req: TaskRequest) -> List[Dict]:
+    def get_bucket_stats(self, req: TaskRequest) -> list[dict]:
         data = self._read_data()
         return data.get("buckets", {}).get(_bucket(req), [])

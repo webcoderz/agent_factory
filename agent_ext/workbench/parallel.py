@@ -1,14 +1,15 @@
 from __future__ import annotations
 
 import asyncio
-from typing import Any, Awaitable, Iterable, List
+from collections.abc import Awaitable, Iterable
+from typing import Any
 
 
 async def gather_bounded(
     coros: Iterable[Awaitable[Any]],
     *,
     max_concurrency: int = 4,
-) -> List[Any]:
+) -> list[Any]:
     """
     Bounded asyncio.gather: prevents saturating your local LLM server.
     """

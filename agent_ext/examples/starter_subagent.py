@@ -1,5 +1,6 @@
 from __future__ import annotations
-from typing import Any, Dict
+
+from typing import Any
 
 from agent_ext.subagents.base import SubagentResult
 
@@ -7,7 +8,7 @@ from agent_ext.subagents.base import SubagentResult
 class LocalKGShapeProposer:
     name = "local_kg_shape_proposer"
 
-    async def run(self, *, input: Any, metadata: Dict[str, Any]) -> SubagentResult:
+    async def run(self, *, input: Any, metadata: dict[str, Any]) -> SubagentResult:
         """
         Replace with your local agent bridge.
         Input could be a list of Evidence chunks or extracted entities.

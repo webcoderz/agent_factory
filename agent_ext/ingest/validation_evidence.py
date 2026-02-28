@@ -1,10 +1,9 @@
 from __future__ import annotations
 
-from typing import List, Optional
-
-from agent_ext.evidence.models import Evidence, Provenance, Citation
-from .validation import OCRValidationReport, ValidationIssue
+from agent_ext.evidence.models import Citation, Evidence, Provenance
 from agent_ext.run_context import RunContext
+
+from .validation import OCRValidationReport, ValidationIssue
 
 
 class ValidationEvidenceEmitter:
@@ -31,10 +30,10 @@ class ValidationEvidenceEmitter:
         *,
         doc_artifact_id: str,
         report: OCRValidationReport,
-    ) -> List[Evidence]:
-        evidences: List[Evidence] = []
+    ) -> list[Evidence]:
+        evidences: list[Evidence] = []
 
-        report_artifact_id: Optional[str] = None
+        report_artifact_id: str | None = None
         if self.store_full_report_artifact:
             report_artifact_id = ctx.artifacts.put_json(
                 report.model_dump(),
@@ -89,9 +88,9 @@ class ValidationEvidenceEmitter:
         ctx: RunContext,
         doc_artifact_id: str,
         report: OCRValidationReport,
-        report_artifact_id: Optional[str],
-    ) -> List[Evidence]:
-        out: List[Evidence] = []
+        report_artifact_id: str | None,
+    ) -> list[Evidence]:
+        out: list[Evidence] = []
         by_page: dict[int, list[ValidationIssue]] = {}
         for issue in report.issues:
             if issue.page_index is None:

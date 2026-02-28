@@ -2,7 +2,6 @@ from __future__ import annotations
 
 import math
 from collections import defaultdict
-from typing import Dict, List, Tuple
 
 
 class UCB1Bandit:
@@ -10,9 +9,10 @@ class UCB1Bandit:
     Simple, deterministic-ish, works well.
     Chooses workflow with best upper confidence bound.
     """
+
     def __init__(self):
-        self.counts: Dict[str, int] = defaultdict(int)
-        self.values: Dict[str, float] = defaultdict(float)
+        self.counts: dict[str, int] = defaultdict(int)
+        self.values: dict[str, float] = defaultdict(float)
         self.total: int = 0
 
     def observe(self, arm: str, reward: float) -> None:
@@ -22,7 +22,7 @@ class UCB1Bandit:
         # incremental mean
         self.values[arm] += (reward - self.values[arm]) / float(n)
 
-    def choose(self, arms: List[str]) -> str:
+    def choose(self, arms: list[str]) -> str:
         # cold-start: pick untried first
         for a in arms:
             if self.counts[a] == 0:

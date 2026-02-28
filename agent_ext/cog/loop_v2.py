@@ -1,13 +1,13 @@
 from __future__ import annotations
-import os, time
-from pathlib import Path
-from typing import Any, Dict, List, Tuple
 
-from .state import Budget, CogState, RegressionMemory
-from .triggers import detect_triggers, repo_fingerprint
-from .modes import choose_mode
-from .strategy_bank import pick_strategies
-from .scoring import score_patch
+import os
+import time
+from pathlib import Path
+from typing import Any
+
+from agent_ext.self_improve.gates import run_gates
+from agent_ext.self_improve.models import GatePlan
+from agent_ext.self_improve.patching import apply_unified_diff
 
 # You already have these pieces:
 # - create_worktree / cleanup_worktree
@@ -15,13 +15,16 @@ from .scoring import score_patch
 # - apply_unified_diff
 # - run_gates / GatePlan
 # - your llm_patch subagent which accepts strategy hints
+from agent_ext.workbench.worktrees import cleanup_worktree, create_worktree, worktree_diff
 
-from agent_ext.workbench.worktrees import create_worktree, cleanup_worktree, worktree_diff
-from agent_ext.self_improve.patching import apply_unified_diff
-from agent_ext.self_improve.gates import run_gates
-from agent_ext.self_improve.models import GatePlan
+from .modes import choose_mode
+from .scoring import score_patch
+from .state import Budget, CogState, RegressionMemory
+from .strategy_bank import pick_strategies
+from .triggers import detect_triggers, repo_fingerprint
 
-def _diff_touched_files(diff_text: str) -> List[str]:
+
+def _diff_touched_files(diff_text: str) -> list[str]:
     files = []
     for line in diff_text.splitlines():
         if line.startswith("diff --git "):
@@ -31,7 +34,8 @@ def _diff_touched_files(diff_text: str) -> List[str]:
                 files.append(b)
     return sorted(set(files))
 
-async def run_cognitive_cycle(ctx, goal: str, budget: Budget) -> Dict[str, Any]:
+
+async def run_cognitive_cycle(ctx, goal: str, budget: Budget) -> dict[str, Any]:
     state: CogState = getattr(ctx, "cog_state", None)
     reg: RegressionMemory = getattr(ctx, "regression_memory", None)
     if state is None or reg is None:
@@ -47,7 +51,7 @@ async def run_cognitive_cycle(ctx, goal: str, budget: Budget) -> Dict[str, Any]:
     bm25_conf = 0.0
     if hits:
         top = hits[0][1]
-        tenth = hits[min(9, len(hits)-1)][1]
+        tenth = hits[min(9, len(hits) - 1)][1]
         bm25_conf = float(top / (top + tenth + 1e-9))
 
     mode = choose_mode(fail_streak=state.fail_streak, triggers=triggers, bm25_confidence=bm25_conf)
@@ -70,7 +74,7 @@ async def run_cognitive_cycle(ctx, goal: str, budget: Budget) -> Dict[str, Any]:
                     "workdir": str(wt.path),
                     "candidates": candidates,
                     "max_files": mode.max_files,
-                    "strategy": strat.prompt_style,   # your patcher should incorporate this into prompt
+                    "strategy": strat.prompt_style,  # your patcher should incorporate this into prompt
                 },
             )
             if not res.ok:
@@ -93,14 +97,16 @@ async def run_cognitive_cycle(ctx, goal: str, budget: Budget) -> Dict[str, Any]:
                 results.append({"strategy": strat.name, "ok": False, "err": f"diff_too_large: {len(diff)}"})
                 continue
 
-            results.append({
-                "strategy": strat.name,
-                "ok": True,
-                "gates_ok": gates.ok,
-                "diff": diff,
-                "diff_chars": len(diff),
-                "files": touched,
-            })
+            results.append(
+                {
+                    "strategy": strat.name,
+                    "ok": True,
+                    "gates_ok": gates.ok,
+                    "diff": diff,
+                    "diff_chars": len(diff),
+                    "files": touched,
+                }
+            )
 
         finally:
             cleanup_worktree(wt, prune_branch=False)
@@ -144,7 +150,7 @@ async def run_cognitive_cycle(ctx, goal: str, budget: Budget) -> Dict[str, Any]:
     (Path(".agent_state/last_patch_path.txt")).write_text(str(patch_path), encoding="utf-8")
 
     if not best_sc.ok or best_score < threshold or not auto:
-        state.fail_streak += (0 if best_sc.ok else 1)
+        state.fail_streak += 0 if best_sc.ok else 1
         state.save()
         return {
             "ok": True,
@@ -158,6 +164,7 @@ async def run_cognitive_cycle(ctx, goal: str, budget: Budget) -> Dict[str, Any]:
 
     # Auto-adopt into current working tree (dev) + commit/push
     from agent_ext.workbench.adopt import apply_diff_to_repo, commit_and_push
+
     apply_diff_to_repo(best_r["diff"], repo_root=Path("."))
 
     main_plan = GatePlan(import_check=True, compile_check=True, pytest_paths=(["tests"] if mode.pytest else []))

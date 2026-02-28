@@ -7,6 +7,7 @@ class ModelLimiter:
     """
     Shared limiter for *all* model calls across subagents.
     """
+
     def __init__(self, max_concurrency: int = 2):
         self._sem = asyncio.Semaphore(max_concurrency)
 
