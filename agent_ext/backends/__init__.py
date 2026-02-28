@@ -1,6 +1,7 @@
 """File storage, execution, and permission backends for AI agents."""
 
 from .base import ExecBackend, ExecResult, FilesystemBackend
+from .composite import CompositeBackend
 from .console import CONSOLE_SYSTEM_PROMPT, ConsoleDeps, create_console_toolset
 from .hashline import apply_hashline_edit, format_hashline_output, line_hash
 from .local_fs import LocalFilesystemBackend

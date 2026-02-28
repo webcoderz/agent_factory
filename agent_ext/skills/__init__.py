@@ -3,7 +3,7 @@
 from .exceptions import SkillError, SkillLoadError, SkillNotFoundError, SkillValidationError
 from .loader import SkillLoader
 from .models import LoadedSkill, SkillSpec, create_skill
-from .registries import CombinedRegistry, FilteredRegistry, PrefixedRegistry
+from .registries import CombinedRegistry, FilteredRegistry, PrefixedRegistry, RenamedRegistry, WrapperRegistry
 from .registry import SkillRegistry
 
 __all__ = [

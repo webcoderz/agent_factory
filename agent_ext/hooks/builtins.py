@@ -169,55 +169,85 @@ class ContentFilterHook(AgentMiddleware):
 
 
 class ConditionalMiddleware(AgentMiddleware):
-    """Wraps another middleware, only executing it when ``condition(ctx)`` is True.
+    """Route to different middleware based on a runtime condition.
 
-    Example::
+    Supports single middleware or when_true/when_false branching.
+
+    Example (simple)::
 
         cond = ConditionalMiddleware(
             PII_Filter(),
             condition=lambda ctx: ctx.policy.redaction_level != "none",
         )
+
+    Example (branching)::
+
+        cond = ConditionalMiddleware(
+            condition=lambda ctx: ctx.policy.allow_exec,
+            when_true=FullAccessMiddleware(),
+            when_false=ReadOnlyMiddleware(),
+        )
     """
 
     def __init__(
         self,
-        inner: AgentMiddleware,
-        condition: Callable[[RunContext], bool],
+        inner: AgentMiddleware | None = None,
+        condition: Callable[[RunContext], bool] | None = None,
+        *,
+        when_true: AgentMiddleware | list[AgentMiddleware] | None = None,
+        when_false: AgentMiddleware | list[AgentMiddleware] | None = None,
     ) -> None:
-        self.inner = inner
+        if condition is None:
+            raise ValueError("condition is required")
         self.condition = condition
+        # Normalize: inner → when_true (backward compat)
+        if inner is not None and when_true is None:
+            when_true = inner
+        self.when_true: list[AgentMiddleware] = (
+            [when_true] if isinstance(when_true, AgentMiddleware) else list(when_true or [])
+        )
+        self.when_false: list[AgentMiddleware] = (
+            [when_false] if isinstance(when_false, AgentMiddleware) else list(when_false or [])
+        )
+
+    def _select(self, ctx: RunContext) -> list[AgentMiddleware]:
+        return self.when_true if self.condition(ctx) else self.when_false
 
     async def before_run(self, ctx, prompt):
-        if self.condition(ctx):
-            return await self.inner.before_run(ctx, prompt)
+        for mw in self._select(ctx):
+            prompt = await mw.before_run(ctx, prompt)
         return prompt
 
     async def after_run(self, ctx, prompt, output):
-        if self.condition(ctx):
-            return await self.inner.after_run(ctx, prompt, output)
+        for mw in reversed(self._select(ctx)):
+            output = await mw.after_run(ctx, prompt, output)
         return output
 
     async def before_model_request(self, ctx, messages):
-        if self.condition(ctx):
-            return await self.inner.before_model_request(ctx, messages)
+        for mw in self._select(ctx):
+            messages = await mw.before_model_request(ctx, messages)
         return messages
 
     async def before_tool_call(self, ctx, tool_name, tool_args):
-        if self.condition(ctx):
-            return await self.inner.before_tool_call(ctx, tool_name, tool_args)
+        for mw in self._select(ctx):
+            tool_args = await mw.before_tool_call(ctx, tool_name, tool_args)
         return tool_args
 
     async def after_tool_call(self, ctx, tool_name, tool_args, result):
-        if self.condition(ctx):
-            return await self.inner.after_tool_call(ctx, tool_name, tool_args, result)
+        for mw in reversed(self._select(ctx)):
+            result = await mw.after_tool_call(ctx, tool_name, tool_args, result)
         return result
 
     async def on_tool_error(self, ctx, tool_name, tool_args, error):
-        if self.condition(ctx):
-            return await self.inner.on_tool_error(ctx, tool_name, tool_args, error)
+        for mw in self._select(ctx):
+            handled = await mw.on_tool_error(ctx, tool_name, tool_args, error)
+            if handled is not None:
+                return handled
         return None
 
     async def on_error(self, ctx, error):
-        if self.condition(ctx):
-            return await self.inner.on_error(ctx, error)
+        for mw in self._select(ctx):
+            handled = await mw.on_error(ctx, error)
+            if handled is not None:
+                return handled
         return None
