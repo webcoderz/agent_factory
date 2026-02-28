@@ -1,10 +1,12 @@
 from __future__ import annotations
+
 import asyncio
-from typing import Any, Dict, List, Tuple
+from typing import Any
+
+from agent_ext.run_context import RunContext
 
 from .base import SubagentResult
 from .registry import SubagentRegistry
-from agent_ext.run_context import RunContext
 
 
 class SubagentOrchestrator:
@@ -14,15 +16,16 @@ class SubagentOrchestrator:
     async def run_many(
         self,
         ctx: RunContext,
-        requests: List[Tuple[str, Any, Dict[str, Any]]],
+        requests: list[tuple[str, Any, dict[str, Any]]],
         *,
         timeout_s: int = 60,
-    ) -> Dict[str, SubagentResult]:
+    ) -> dict[str, SubagentResult]:
         """
         requests: [(subagent_name, input, metadata), ...]
         returns dict keyed by subagent_name (last write wins)
         """
-        async def _one(name: str, inp: Any, meta: Dict[str, Any]) -> tuple[str, SubagentResult]:
+
+        async def _one(name: str, inp: Any, meta: dict[str, Any]) -> tuple[str, SubagentResult]:
             agent = self.registry.get(name)
             ctx.logger.info("subagent.start", name=name, trace_id=ctx.trace_id)
             try:
@@ -37,7 +40,7 @@ class SubagentOrchestrator:
         for p in pending:
             p.cancel()
 
-        out: Dict[str, SubagentResult] = {}
+        out: dict[str, SubagentResult] = {}
         for d in done:
             k, v = await d
             out[k] = v

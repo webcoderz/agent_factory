@@ -1,23 +1,26 @@
 from __future__ import annotations
 
 import hashlib
-from typing import Any, Callable, Dict, List, Optional, Tuple
+from collections.abc import Callable
+from typing import Any
 
 from pydantic import BaseModel, Field
 
-from .base import MemoryManager
 from agent_ext.run_context import RunContext
+
+from .base import MemoryManager
 
 
 class Dossier(BaseModel):
     """
     Long-lived compressed state for a case/session.
     """
-    pinned_facts: List[str] = Field(default_factory=list)
-    timeline: List[str] = Field(default_factory=list)
-    entities: List[str] = Field(default_factory=list)
-    decisions: List[str] = Field(default_factory=list)
-    open_questions: List[str] = Field(default_factory=list)
+
+    pinned_facts: list[str] = Field(default_factory=list)
+    timeline: list[str] = Field(default_factory=list)
+    entities: list[str] = Field(default_factory=list)
+    decisions: list[str] = Field(default_factory=list)
+    open_questions: list[str] = Field(default_factory=list)
     summary: str = ""
 
 
@@ -70,11 +73,11 @@ class SummarizingMemory(MemoryManager):
         self.summarize_fn = summarize_fn
         self.message_to_text = message_to_text
 
-        self._dossier: Optional[Dossier] = None
-        self._dossier_artifact_id: Optional[str] = None
-        self._last_input_hash: Optional[str] = None
+        self._dossier: Dossier | None = None
+        self._dossier_artifact_id: str | None = None
+        self._last_input_hash: str | None = None
 
-    def shape_messages(self, messages: List[Any]) -> List[Any]:
+    def shape_messages(self, messages: list[Any]) -> list[Any]:
         # If we already have a dossier, prepend it as a synthetic system message.
         if not self._dossier:
             # Window only
@@ -89,7 +92,7 @@ class SummarizingMemory(MemoryManager):
         shaped = [dossier_msg, *tail]
         return shaped[-self.cfg.max_messages :]
 
-    def checkpoint(self, messages: List[Any], *, outcome: Any) -> None:
+    def checkpoint(self, messages: list[Any], *, outcome: Any) -> None:
         # Only summarize if we have enough history.
         if len(messages) < self.cfg.min_messages_before_summarize:
             return
@@ -128,7 +131,7 @@ class SummarizingMemory(MemoryManager):
         self._last_input_hash = input_hash
 
     # --- wiring: ctx is set by composition root after instantiation
-    _ctx: Optional[RunContext] = None
+    _ctx: RunContext | None = None
 
     def bind_ctx(self, ctx: RunContext) -> None:
         self._ctx = ctx
@@ -141,7 +144,7 @@ class SummarizingMemory(MemoryManager):
     @staticmethod
     def _render_dossier(d: Dossier) -> str:
         # Keep it compact; model should treat as authoritative "case memory".
-        lines: List[str] = []
+        lines: list[str] = []
         if d.summary:
             lines.append(f"CASE DOSSIER SUMMARY:\n{d.summary}\n")
         if d.pinned_facts:

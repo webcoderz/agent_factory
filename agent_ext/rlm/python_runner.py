@@ -1,9 +1,9 @@
 from __future__ import annotations
+
 import io
-import sys
 import time
-from contextlib import redirect_stdout, redirect_stderr
-from typing import Any, Dict
+from contextlib import redirect_stderr, redirect_stdout
+from typing import Any
 
 from .policies import RLMPolicy
 
@@ -12,7 +12,7 @@ class RLMRunError(RuntimeError):
     pass
 
 
-def run_restricted_python(code: str, *, policy: RLMPolicy, globals_in: Dict[str, Any] | None = None) -> Dict[str, Any]:
+def run_restricted_python(code: str, *, policy: RLMPolicy, globals_in: dict[str, Any] | None = None) -> dict[str, Any]:
     """
     Minimal safe-ish runner:
     - allows only a controlled import set via custom __import__
@@ -27,7 +27,7 @@ def run_restricted_python(code: str, *, policy: RLMPolicy, globals_in: Dict[str,
             raise ImportError(f"Import not allowed: {name}")
         return __import__(name, globals, locals, fromlist, level)
 
-    g: Dict[str, Any] = dict(globals_in or {})
+    g: dict[str, Any] = dict(globals_in or {})
     g["__builtins__"] = dict(__builtins__)
     g["__builtins__"]["__import__"] = limited_import
 

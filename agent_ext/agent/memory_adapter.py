@@ -9,9 +9,11 @@ with pydantic-ai's message history and history_processors.
   with ToolCallPart and the following ModelRequest with ToolReturnPart).
 - Full round-trip: generic dicts keep _original so tool calls are preserved.
 """
+
 from __future__ import annotations
 
-from typing import TYPE_CHECKING, Any, Callable, List, Optional
+from collections.abc import Callable
+from typing import TYPE_CHECKING, Any
 
 if TYPE_CHECKING:
     from agent_ext.memory.base import MemoryManager
@@ -19,6 +21,7 @@ if TYPE_CHECKING:
 
 
 # --- Tool call inspection and safe truncation ---
+
 
 def message_kind(msg: Any) -> str:
     """
@@ -62,11 +65,11 @@ def has_tool_returns(msg: Any) -> bool:
 
 
 def safe_truncate_messages(
-    messages: List[Any],
+    messages: list[Any],
     max_messages: int,
     *,
     only_before_request: bool = True,
-) -> List[Any]:
+) -> list[Any]:
     """
     Truncate from the front so at most max_messages remain, without breaking tool call pairs.
 
@@ -105,7 +108,7 @@ def _model_message_to_dict(msg: Any) -> dict[str, Any]:
         d = msg.model_dump()
         # ModelRequest has 'parts', ModelResponse has 'parts'
         parts = d.get("parts", [])
-        content_parts: List[str] = []
+        content_parts: list[str] = []
         role = "message"
         for p in parts:
             if isinstance(p, dict):
@@ -165,6 +168,7 @@ def _dict_to_model_message(d: dict[str, Any]) -> Any:
     if role == "system":
         try:
             from pydantic_ai.messages import SystemPromptPart
+
             return ModelRequest(parts=[SystemPromptPart(content=content)])
         except ImportError:
             return ModelRequest(parts=[UserPromptPart(content=f"[System]\n{content}")])
@@ -198,10 +202,10 @@ def _dict_to_model_message_safe(d: dict[str, Any]) -> Any:
 
 
 def model_messages_to_generic(
-    messages: List[Any],
+    messages: list[Any],
     *,
     preserve_originals: bool = True,
-) -> List[dict[str, Any]]:
+) -> list[dict[str, Any]]:
     """
     Convert pydantic-ai ModelMessage list to list of dicts for our memory.
     When preserve_originals=True (default), each dict has _original so tool calls
@@ -212,12 +216,12 @@ def model_messages_to_generic(
     return [_model_message_to_dict_v2(m) for m in messages]
 
 
-def generic_to_model_messages(generic: List[Any]) -> List[Any]:
+def generic_to_model_messages(generic: list[Any]) -> list[Any]:
     """
     Convert list of dicts (from our memory) back to pydantic-ai ModelMessage list.
     If a dict has _original, that message is used as-is (preserves tool calls).
     """
-    out: List[Any] = []
+    out: list[Any] = []
     for m in generic:
         if isinstance(m, dict) and "_original" in m:
             out.append(m["_original"])
@@ -228,20 +232,20 @@ def generic_to_model_messages(generic: List[Any]) -> List[Any]:
     return out
 
 
-def _get_memory_max_messages(memory: Any) -> Optional[int]:
+def _get_memory_max_messages(memory: Any) -> int | None:
     """Get max_messages from SlidingWindowMemory or SummarizingMemory.cfg."""
     if hasattr(memory, "max_messages"):
-        return getattr(memory, "max_messages")
+        return memory.max_messages
     if hasattr(memory, "cfg") and memory.cfg is not None:
         return getattr(memory.cfg, "max_messages", None)
     return None
 
 
 def build_history_processor(
-    memory: "MemoryManager",
+    memory: MemoryManager,
     *,
-    max_messages_for_safe_truncate: Optional[int] = None,
-) -> Callable[..., List[Any]]:
+    max_messages_for_safe_truncate: int | None = None,
+) -> Callable[..., list[Any]]:
     """
     Build a pydantic-ai history_processor that uses our MemoryManager.shape_messages.
 
@@ -264,8 +268,8 @@ def build_history_processor(
 
     def processor(
         ctx_or_messages: Any,
-        messages: Optional[List[Any]] = None,
-    ) -> List[Any]:
+        messages: list[Any] | None = None,
+    ) -> list[Any]:
         if messages is None:
             messages = ctx_or_messages
             ctx = None
@@ -285,9 +289,9 @@ def build_history_processor(
 
 
 def checkpoint_after_run(
-    memory: "MemoryManager",
-    ctx: "RunContext",
-    all_messages: List[Any],
+    memory: MemoryManager,
+    ctx: RunContext,
+    all_messages: list[Any],
     outcome: Any,
 ) -> None:
     """

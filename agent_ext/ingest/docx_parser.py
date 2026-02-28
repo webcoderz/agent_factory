@@ -9,7 +9,6 @@ of your pipeline stays unchanged.
 """
 
 from dataclasses import dataclass
-from typing import List
 
 from .models import OCRPage
 
@@ -18,20 +17,18 @@ from .models import OCRPage
 class DocxParser:
     paragraphs_per_chunk: int = 40
 
-    def parse_bytes(self, doc_bytes: bytes) -> List[OCRPage]:
+    def parse_bytes(self, doc_bytes: bytes) -> list[OCRPage]:
         try:
             from docx import Document
         except Exception as e:
-            raise ImportError(
-                "python-docx is required. Install with: pip install python-docx"
-            ) from e
+            raise ImportError("python-docx is required. Install with: pip install python-docx") from e
 
         import io
 
         doc = Document(io.BytesIO(doc_bytes))
 
-        pages: List[OCRPage] = []
-        buf: List[str] = []
+        pages: list[OCRPage] = []
+        buf: list[str] = []
         page_index = 0
 
         def flush():

@@ -1,7 +1,8 @@
 from __future__ import annotations
 
+from collections.abc import Sequence
 from dataclasses import dataclass
-from typing import Any, Dict, List, Optional, Sequence, Set, Tuple
+from typing import Any
 
 from agent_ext.evidence.models import Evidence
 
@@ -11,8 +12,9 @@ class OCRRetryAction:
     """
     One recommended action. Your router can pick one or sequence them.
     """
+
     kind: str  # "rerender_pages" | "rerun_ocr" | "rerun_ocr_pages" | "switch_engine" | "increase_dpi"
-    params: Dict[str, Any]
+    params: dict[str, Any]
     reason: str
     priority: int = 50  # smaller = earlier
 
@@ -20,19 +22,19 @@ class OCRRetryAction:
 @dataclass
 class OCRRetryPlan:
     ok: bool
-    actions: List[OCRRetryAction]
+    actions: list[OCRRetryAction]
     summary: str
-    failed_pages: List[int]
-    warn_pages: List[int]
-    metrics: Dict[str, Any]
+    failed_pages: list[int]
+    warn_pages: list[int]
+    metrics: dict[str, Any]
 
 
-def _extract_validation_evidence(evidence_chunks: Sequence[Evidence]) -> Tuple[List[Evidence], List[Evidence]]:
+def _extract_validation_evidence(evidence_chunks: Sequence[Evidence]) -> tuple[list[Evidence], list[Evidence]]:
     """
     Returns (doc_level, page_level) validation evidences.
     """
-    doc_level: List[Evidence] = []
-    page_level: List[Evidence] = []
+    doc_level: list[Evidence] = []
+    page_level: list[Evidence] = []
     for e in evidence_chunks:
         if e.kind != "validation":
             continue
@@ -48,9 +50,9 @@ def _extract_validation_evidence(evidence_chunks: Sequence[Evidence]) -> Tuple[L
     return doc_level, page_level
 
 
-def _pages_from_page_evidence(page_level: Sequence[Evidence]) -> Tuple[Set[int], Set[int]]:
-    failed: Set[int] = set()
-    warned: Set[int] = set()
+def _pages_from_page_evidence(page_level: Sequence[Evidence]) -> tuple[set[int], set[int]]:
+    failed: set[int] = set()
+    warned: set[int] = set()
     for e in page_level:
         c = e.content if isinstance(e.content, dict) else {}
         page = c.get("page_index")
@@ -64,7 +66,7 @@ def _pages_from_page_evidence(page_level: Sequence[Evidence]) -> Tuple[Set[int],
     return failed, warned
 
 
-def _doc_failure(doc_level: Sequence[Evidence]) -> Tuple[bool, Dict[str, Any], List[Dict[str, Any]]]:
+def _doc_failure(doc_level: Sequence[Evidence]) -> tuple[bool, dict[str, Any], list[dict[str, Any]]]:
     """
     Returns (ok, metrics, issues)
     """
@@ -88,7 +90,7 @@ def build_ocr_retry_plan(
     max_dpi: int = 350,
     dpi_step: int = 100,
     current_engine: str = "primary",
-    alternate_engines: Optional[List[str]] = None,
+    alternate_engines: list[str] | None = None,
     allow_llm_vision_fallback: bool = True,
     prefer_page_subset_retry: bool = True,
 ) -> OCRRetryPlan:
@@ -105,7 +107,7 @@ def build_ocr_retry_plan(
     ok, metrics, issues = _doc_failure(doc_level)
     failed_pages, warn_pages = _pages_from_page_evidence(page_level)
 
-    actions: List[OCRRetryAction] = []
+    actions: list[OCRRetryAction] = []
 
     # If no failures, nothing to do
     if ok and not failed_pages:
@@ -230,7 +232,12 @@ def build_ocr_retry_plan(
         actions.append(
             OCRRetryAction(
                 kind="switch_engine",
-                params={"from": current_engine, "to": "llm_vision" if allow_llm_vision_fallback else (alternate_engines[0] if alternate_engines else "secondary")},
+                params={
+                    "from": current_engine,
+                    "to": "llm_vision"
+                    if allow_llm_vision_fallback
+                    else (alternate_engines[0] if alternate_engines else "secondary"),
+                },
                 reason="Many pages are empty/near-empty; this often indicates OCR engine mismatch with scan/layout. Consider LLM vision fallback.",
                 priority=25,
             )

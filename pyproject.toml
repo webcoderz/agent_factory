@@ -1,26 +1,76 @@
 [project]
 name = "agent-patterns"
-version = "0.1.0"
-description = "Add your description here"
+dynamic = ["version"]
+description = "Modular, pluggable subsystems for building AI agents with pydantic-ai"
 readme = "README.md"
 requires-python = ">=3.12"
 dependencies = [
     "asyncpg>=0.31.0",
+    "python-dotenv>=1.0.0",
     "httpx>=0.28.1",
     "pdf2img>=0.1.2",
     "pydantic>=2.12.5",
-]
-[project.optional-dependencies]
-# Install with: pip install agent-patterns[agent] or uv add "agent-patterns[agent]"
-# Use this extra when you want PydanticAIAgentBase and LLMVisionOCREngine.
-# If your app already has pydantic-ai (any version), you can omit [agent] and
-# the package will use your installed pydantic-ai when you use the agent/vision OCR.
-agent = [
+    "python-dotenv>=1.2.1",
+    "python-pptx>=1.0.2",
+    "rich>=14.3.2",
+    "python-docx>=1.2.0",
+    "reportlab>=4.4.10",
     "pydantic-ai>=1.60.0",
 ]
 
-docs = [
-    "python-docx>=1.2.0",
-    "python-pptx>=1.0.2",
-    "reportlab>=4.4.10",
+[build-system]
+requires = ["hatchling"]
+build-backend = "hatchling.build"
+
+[tool.hatch.version]
+path = "agent_ext/__init__.py"
+
+[tool.hatch.build.targets.wheel]
+only-include = ["agent_ext"]
+
+[tool.hatch.build.targets.wheel.force-include]
+"__init__.py" = "agent_patterns/__init__.py"
+"run_context.py" = "agent_patterns/run_context.py"
+"config.py" = "agent_patterns/config.py"
+
+[dependency-groups]
+dev = [
+    "pytest>=9.0.2",
+    "pytest-asyncio>=1.3.0",
+    "ruff>=0.11.0",
 ]
+
+[project.scripts]
+workbench = "agent_ext.workbench.__main__:main"
+agent-cog-daemon = "agent_ext.cog.__main__:main"
+
+# --- Ruff (linter + formatter) ---
+
+[tool.ruff]
+target-version = "py312"
+line-length = 120
+
+[tool.ruff.lint]
+select = ["E", "F", "W", "I", "UP", "B", "SIM"]
+ignore = [
+    "E501",   # line too long (handled by formatter)
+    "E402",   # module-level import not at top (intentional: _ensure_root_importable)
+    "E731",   # lambda assignment (used in tests and callbacks)
+    "E741",   # ambiguous variable name (l, O, I — common in math/loop code)
+    "B008",   # function call in default arg (pydantic pattern)
+    "B905",   # zip strict (py310+)
+    "UP007",  # X | Y union syntax (some places use Optional)
+    "SIM108", # ternary instead of if-else (sometimes less readable)
+    "F401",   # unused import (many re-exports in __init__.py files)
+]
+
+[tool.ruff.lint.isort]
+known-first-party = ["agent_ext", "agent_patterns"]
+
+[tool.ruff.format]
+quote-style = "double"
+
+# --- Pytest ---
+
+[tool.pytest.ini_options]
+asyncio_mode = "auto"

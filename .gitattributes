@@ -1,0 +1,4 @@
+# When merging a PR into main/dev, do not take .agent_state from the PR branch.
+# Shared learning state lives on agent-state/main; code branches should not merge state.
+# Requires: git config merge.keep-ours.driver "true" (see docs/AUTO_AGENT.md)
+.agent_state/** merge=keep-ours

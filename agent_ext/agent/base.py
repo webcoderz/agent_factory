@@ -30,9 +30,10 @@ Example:
     # Next turn: pass message_history so the agent sees the conversation
     result2 = agent.run_sync(ctx, "And that in hex?", message_history=result.new_messages())
 """
+
 from __future__ import annotations
 
-from typing import Any, Optional, TypeVar
+from typing import Any, TypeVar
 
 from pydantic import BaseModel
 from pydantic_ai import Agent
@@ -68,7 +69,7 @@ class PydanticAIAgentBase(Agent[PatternsRunContext, OutputT]):
         *,
         output_type: type[OutputT] = str,  # type: ignore[assignment]
         instructions: str | None = None,
-        memory: Optional[Any] = None,
+        memory: Any | None = None,
         **kwargs: Any,
     ) -> None:
         if memory is not None:

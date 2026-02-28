@@ -1,11 +1,11 @@
 from __future__ import annotations
 
 import io
+
 from pptx import Presentation
 
 
 class PptxExporter:
-
     def mime_type(self) -> str:
         return "application/vnd.openxmlformats-officedocument.presentationml.presentation"
 
