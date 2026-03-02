@@ -15,7 +15,7 @@ wheels = [
 ]
 
 [[package]]
-name = "agent-patterns"
+name = "agent-factory"
 source = { editable = "." }
 dependencies = [
     { name = "asyncpg" },
