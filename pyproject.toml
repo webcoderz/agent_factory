@@ -1,5 +1,5 @@
 [project]
-name = "agent-patterns"
+name = "agent-factory"
 dynamic = ["version"]
 description = "Modular, pluggable subsystems for building AI agents with pydantic-ai"
 readme = "README.md"
@@ -65,7 +65,7 @@ ignore = [
 ]
 
 [tool.ruff.lint.isort]
-known-first-party = ["agent_ext", "agent_patterns"]
+known-first-party = ["agent_ext", "agent_factory"]
 
 [tool.ruff.format]
 quote-style = "double"
