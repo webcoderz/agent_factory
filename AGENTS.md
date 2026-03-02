@@ -2,7 +2,7 @@
 
 ## Overview
 
-**agent_patterns** is a self-improving, self-assembling agentic system. It provides modular, pluggable subsystems for building AI agents: middleware, subagents, memory, backends, skills, RLM, database, and a workbench TUI for interactive development. All subsystems are at feature parity with their upstream reference implementations.
+**agent_factory** is a self-improving, self-assembling agentic system. It provides modular, pluggable subsystems for building AI agents: middleware, subagents, memory, backends, skills, RLM, database, and a workbench TUI for interactive development. All subsystems are at feature parity with their upstream reference implementations.
 
 ---
 
